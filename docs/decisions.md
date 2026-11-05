@@ -27,11 +27,11 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-05 | S5 | 2nd Kaggle run: GPU + tests OK, smoke failed at LoRA injection. Added `scripts/kaggle_setup.sh` (installs deps, uninstalls torchao, self-checks peft); notebook calls it | peft 0.21 rejects Kaggle's preinstalled torchao 0.10 | D-014 | b156f63 |
 | 2026-11-05 | S4/S5 | **Run 1 complete** (Kaggle T4, commit 29b1596): zero-shot baseline + LoRA fine-tune + val predictions; adapter on HF Hub; results copied to `results/` | First full pipeline run | D-015 | a8b846d |
 | 2026-11-05 | S4 | Fixed output filenames: `with_suffix` truncated `qwen2.5-1.5b_val` → `qwen2.5-1.jsonl` | Found in run 1 outputs | D-015 | a8b846d |
-| 2026-11-05 | S4 | Prompt versioning: v1 (names only, run 1) kept; v2 adds a one-line definition per label | Degenerate zero-shot baseline in run 1 | D-016 | (pending) |
-| 2026-11-05 | S5 | Optional per-group oversampling (`train.oversample`: target 60, max 4×) | Rare-class collapse in run 1 | D-016 | (pending) |
-| 2026-11-05 | S5 | Restored `weight_decay` argument accidentally commented out by the D-012 edit | Found while reviewing `run.py`; no effect on run 1 (0.0 = default) | D-016 | (pending) |
-| 2026-11-05 | S1/S5 | Configs are now per run (`configs/run1.yaml`, `configs/run2.yaml`) with `run_name`; Kaggle steps moved to `scripts/kaggle_pipeline.sh`; notebook reduced to choosing `CONFIG` | A new experiment shouldn't need notebook edits | D-016 | (pending) |
-| 2026-11-05 | S1 | Added `docs/runs.md`: numbered log of every run attempt, including failures | User request | — | (pending) |
+| 2026-11-05 | S4 | Prompt versioning: v1 (names only, run 1) kept; v2 adds a one-line definition per label | Degenerate zero-shot baseline in run 1 | D-016 | 800548a |
+| 2026-11-05 | S5 | Optional per-group oversampling (`train.oversample`: target 60, max 4×) | Rare-class collapse in run 1 | D-016 | 800548a |
+| 2026-11-05 | S5 | Restored `weight_decay` argument accidentally commented out by the D-012 edit | Found while reviewing `run.py`; no effect on run 1 (0.0 = default) | D-016 | 800548a |
+| 2026-11-05 | S1/S5 | Configs are now per run (`configs/run1.yaml`, `configs/run2.yaml`) with `run_name`; Kaggle steps moved to `scripts/kaggle_pipeline.sh`; notebook reduced to choosing `CONFIG` | A new experiment shouldn't need notebook edits | D-016 | 800548a |
+| 2026-11-05 | S1 | Added `docs/runs.md`: numbered log of every run attempt, including failures | User request | — | 800548a |
 
 ---
 
