@@ -91,3 +91,9 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 **Protocol:** `--smoke` trains on 16 examples (always including the longest) for 10 steps, with eval and save every 5 steps. It then reloads the saved adapter, generates on 2 val examples and reports peak GPU memory.
 **Bug caught locally:** transformers 5.22 removed `warmup_ratio`. A float `warmup_steps` in [0,1) is now read as a ratio. Fixed before any GPU time was spent.
 **Status:** accepted
+
+## D-013: First Kaggle run: no GPU, and dependency pins conflicted (2026-11-05)
+**What happened:** The first committed Kaggle version ran on the CPU image (`torch 2.11.0+cpu`) because no accelerator was selected. The GPU check in the notebook failed after about 2 minutes, before any training, which is what it is for. pip also reported conflicts: pinning `numpy==2.5.4`/`pandas==3.1.1` replaced Kaggle's preinstalled builds (numba requires numpy<2.3; google-colab requires pandas==2.2.3).
+**Decision:** Pin only the ML stack (`transformers`, `peft`, `accelerate`, `datasets`). Use the platform's `torch`/`numpy`/`pandas`, and record their exact versions in every run's metadata instead. The notebook now checks for a GPU in the kernel and fails with a clear message telling you how to fix it.
+**Why:** Overriding the platform's numerical libraries risks binary incompatibilities. Logging the versions keeps reproducibility.
+**Status:** accepted
