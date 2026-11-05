@@ -1,8 +1,33 @@
 # Decision Log
 
-Architectural and technical decisions, with alternatives and reasoning. Newest at the bottom.
+Two parts:
+1. **Changelog:** what changed, at which project stage, and why (one row per change, newest at the bottom).
+2. **Decisions:** the full reasoning for each architectural or technical decision (D-XXX), referenced from the changelog.
+
+Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/model choice · S4 Baseline · S5 Fine-tuning · S6 Eval (Task 2) · S7 KV cache (Task 3) · S8 Tiled attention (Task 4) · S9 Speculative decoding (Task 5) · S10 App (Task 6) · S11 Report · S12 Submission.
 
 ---
+
+## Changelog
+
+| Date | Stage | Change | Reason / trigger | Ref | Commit |
+|---|---|---|---|---|---|
+| 2026-11-05 | S1 | Created plan, CLAUDE.md and decision log | Project kickoff | D-001–D-003 | 51ef949 |
+| 2026-11-05 | S2 | Dataset loader drops GPT-4 columns + `explanation_correctness` + `training` | Leakage rule (B2) | D-005 | 51ef949 |
+| 2026-11-05 | S2 | Fixed 37/8/8 split + manifest + 9 leakage/split tests | Prescribed protocol (B1) | D-006 | 51ef949 |
+| 2026-11-05 | S3 | Model candidates narrowed to Qwen2.5-1.5B target / 0.5B draft; 3B rejected | 3B license is not Apache; identical tokenizer verified | D-004 → D-008 | 834516d |
+| 2026-11-05 | S4 | Output schema `{"evidence_ids", "label"}`; no free-text explanation training | Dataset has no expert explanations; GPT-4 ones forbidden | D-009 | 834516d |
+| 2026-11-05 | S5 | `max_len=1024`, no truncation (longest example 625 tokens) | Measured token lengths | D-008 | 834516d |
+| 2026-11-05 | S5 | `warmup_ratio` → float `warmup_steps` | Local CPU smoke test crashed: removed in transformers 5.22 | D-012 | 834516d |
+| 2026-11-05 | S5 | Local CPU smoke training abandoned; all model runs moved to Kaggle | Laptop has 16 GB RAM, no NVIDIA GPU; CPU run was killed after step 5 | D-012 | — |
+| 2026-11-05 | S5 | Kaggle notebook changed to run the full training automatically once smoke tests pass | One "Save & Run All" per experiment | D-012 | 316e638 |
+| 2026-11-05 | S5 | First Kaggle run failed: no GPU selected (`torch+cpu`). Added in-kernel GPU check with fix-it message | Accelerator not set before commit | D-013 | e8ec91e |
+| 2026-11-05 | S5 | Stopped pinning numpy/pandas; versions now logged per run | pip conflicts with Kaggle's preinstalled packages | D-013 | e8ec91e |
+| 2026-11-05 | S10 | Planned app hosting changed from laptop to free HF Space (CPU, 16 GB) | Laptop RAM too small for 1.5B + 0.5B draft | D-014 (to be written at S10) | — |
+
+---
+
+## Decisions
 
 ## D-001: Compute platform: Kaggle (2026-11-05)
 **Context:** Only free compute is allowed; training needs a GPU.

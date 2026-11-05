@@ -13,4 +13,5 @@
 - Every architectural, modelling, data, training, evaluation or tooling decision goes in `docs/decisions.md` as a new dated entry, written at the time the decision is made, without waiting to be asked.
 - Also log failures, rejected alternatives and changes of direction. A reversed decision gets a new entry that references the old one; never delete old entries.
 - Entry format: `## D-XXX: <title> (YYYY-MM-DD)` with **Context**, **Options considered**, **Decision**, **Why** (evidence: numbers, links, sources), **Consequences/risks**, **Status** (proposed / accepted / superseded by D-YYY).
+- Every change to code, config, data processing, infrastructure or plan also gets a row in the **Changelog** table at the top of `docs/decisions.md`: date, stage (S1–S12 from `ASSIGNMENT_PLAN.md`), what changed, the reason or trigger (a bug, a failed run, a measurement, a user request), the linked D-XXX entry, and the commit hash (fill it in after committing). Add the row in the same commit as the change whenever possible.
 - This file feeds the report's Related Work, Methods, Limitations and rubric item A3, so keep the reasoning concrete.
