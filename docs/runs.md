@@ -10,7 +10,8 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 1 | 2026-11-05 | Kaggle (no accelerator) | run1 / 316e638 | Failed in 2 min | No GPU: CPU-only torch |
 | 2 | 2026-11-05 | Kaggle T4 | run1 / 965d874 | Failed in 1.5 min | torchao 0.10 vs peft 0.21 |
 | 3 | 2026-11-05 | Kaggle T4 | run1 / 29b1596 | **Success** | Val acc 0.743, macro-F1 0.432 |
-| 4 | 2026-11-05 | Kaggle T4 | run2 / (pending) | Pending | — |
+| 4 | 2026-11-05 | Kaggle T4 | run2 / 800548a | Running | — |
+| 5 | 2026-11-05 | Laptop CPU | attention benchmark (fp32) / (this commit) | **Success** | Tiled = reference within ~1e-6; 4096× smaller score buffer; slower than fused SDPA |
 
 ---
 
@@ -60,3 +61,20 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 - **Hypotheses:** (a) v2 raises zero-shot accuracy well above 0.068; (b) oversampling raises fine-tuned macro-F1 without a large accuracy drop.
 - **Caveat:** two changes at once, so the fine-tuned difference can't be attributed to just one of them. The zero-shot v1 vs v2 comparison isolates the prompt effect. If time allows, run 3 = v2 without oversampling.
 - **Results:** (to be filled in)
+
+## Attempt 5: Task 4 attention benchmark (laptop CPU, fp32)
+- **Run:** `python -m src.attention.benchmark --dtype float32` (blocks 64×64; 3 warm-up + 10 timed repeats; median ± std). Correctness first: `pytest tests/test_attention.py` gives **52 passed**. Tiled matches the reference to 1e-10 in fp64 across 6 shapes × causal/non-causal × 3 block sizes (16×16, 64×32, 7×13), including Lq=1 decode against a cache and chunked prefill (Lq < Lk). fp16 max error is under 2e-3, and logits around 1e4 stay finite.
+- **What happened:** completed. Errors are measured against an fp64 ground truth.
+
+| Shape (B,H,Lq,Lk,D=128) | Causal | Reference ms | Tiled ms | SDPA ms | Max abs err (tiled) | Score buffer ref / tiled (MiB) |
+|---|---|---|---|---|---|---|
+| 1,12,512,512 | no | 18.3 | 39.0 | 11.4 | 5.4e-7 | 12 / 0.19 |
+| 1,12,1024,1024 | yes | 86.5 | 87.8 | 33.3 | 1.2e-6 | 48 / 0.19 |
+| 1,12,2048,2048 | yes | 971 | 947 | 255 | 1.8e-6 | 192 / 0.19 |
+| 1,12,4096,4096 | no | 2833 | 7048 | 1529 | 3.1e-7 | 768 / 0.19 |
+| 1,12,4096,4096 | yes | 3208 | 3554 | 873 | 1.2e-6 | 768 / 0.19 |
+| 8,12,1,2048 (decode) | yes | 14.9 | 38.5 | 11.3 | 4.7e-8 | 0.75 / 0.05 |
+
+- **Interpretation:** all three implementations are numerically equivalent at fp32 precision. Tiling cuts the score buffer from O(Lq·Lk) to O(bq·bk), so it is 4096× smaller at L=4096. The Python tiled version is **slower** without causal masking, because of a Python loop with one small matmul per tile (kernel launches and allocations each time). With causal masking it skips fully masked tiles (about half the work) and roughly ties the reference. Fused SDPA is 2–4× faster than both: it runs in a single kernel, keeps tiles in on-chip memory and uses optimised GEMMs. This is the expected result for an educational implementation (assignment Task 4).
+- **Noise:** some runs have large std (e.g. tiled at L=2048 non-causal: ±574 ms) from laptop CPU frequency scaling and background load. The **GPU benchmark on Kaggle** (fp16, synchronised timing, CUDA peak memory) is still to run; it will be the reported one.
+- **Results file:** `results/attention/benchmark_cpu_float32.json`.

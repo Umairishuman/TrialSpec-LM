@@ -32,6 +32,7 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-05 | S5 | Restored `weight_decay` argument accidentally commented out by the D-012 edit | Found while reviewing `run.py`; no effect on run 1 (0.0 = default) | D-016 | 800548a |
 | 2026-11-05 | S1/S5 | Configs are now per run (`configs/run1.yaml`, `configs/run2.yaml`) with `run_name`; Kaggle steps moved to `scripts/kaggle_pipeline.sh`; notebook reduced to choosing `CONFIG` | A new experiment shouldn't need notebook edits | D-016 | 800548a |
 | 2026-11-05 | S1 | Added `docs/runs.md`: numbered log of every run attempt, including failures | User request | — | 800548a |
+| 2026-11-05 | S8 | Task 4: `src/attention/attention.py` (reference SDPA + tiled online-softmax), 52 correctness tests, `src/attention/benchmark.py` with `--smoke` | Task 4 requirements (E1–E3) | D-017 | (this commit) |
 
 ---
 
@@ -161,3 +162,14 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 **Decision:** prompt v2 with definitions that match that convention. Oversample to 60 rows per group, capped at 4×, so a 5-example group isn't repeated 12 times (memorisation risk). Validation is the only selection signal; the test set stays untouched.
 **Tension to discuss in the report:** the assignment says absent evidence must never be treated as proof. The expert labels, however, map "condition not reported" to "not excluded". We follow the gold convention for the metrics, and the app will flag such decisions as "no supporting evidence cited" rather than presenting them as confirmed.
 **Status:** accepted (results in docs/runs.md, attempt 4)
+
+## D-017: Task 4 attention design (2026-11-05)
+**Context:** Rubric E1–E3 asks for a correct reference SDPA, a tiled online-softmax variant that doesn't call a fused backend, multi-shape causal tests with max/mean error, and an honest speed/memory comparison.
+**Decisions:**
+- **Causal convention with an offset:** queries are the *last* Lq positions of the keys (offset = Lk − Lq), so query i sees keys j ≤ i + offset. One code path covers prefill (Lq = Lk), single-token cached decode (Lq = 1) and chunked prefill. This is the same masking the Task 3 KV-cached decoder needs.
+- **Accumulation dtype:** fp32 for fp16/fp32 inputs, and fp64 for fp64 inputs, so tests can demand 1e-10 agreement. The output is cast back to the input dtype, as fused kernels do.
+- **Online softmax:** per query block, keep a running max m, normaliser l and unnormalised accumulator; rescale by exp(m_old − m_new) whenever the max increases. NaN is impossible because every row sees key 0 in its first tile, so m is finite from the first tile on.
+- **Causal tile skipping:** stop the key loop at the last visible key of the query block, and mask only tiles that cross the diagonal.
+- **Ground truth:** benchmark errors are computed against an fp64 reference, so reference, tiled and SDPA are compared against the same truth.
+**Options rejected:** writing a Triton/CUDA kernel (not required by the assignment; not portable to CPU and P100); measuring only against SDPA (SDPA's own fp16 error would be hidden).
+**Status:** accepted
