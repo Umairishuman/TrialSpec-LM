@@ -32,7 +32,7 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-05 | S5 | Restored `weight_decay` argument accidentally commented out by the D-012 edit | Found while reviewing `run.py`; no effect on run 1 (0.0 = default) | D-016 | 800548a |
 | 2026-11-05 | S1/S5 | Configs are now per run (`configs/run1.yaml`, `configs/run2.yaml`) with `run_name`; Kaggle steps moved to `scripts/kaggle_pipeline.sh`; notebook reduced to choosing `CONFIG` | A new experiment shouldn't need notebook edits | D-016 | 800548a |
 | 2026-11-05 | S1 | Added `docs/runs.md`: numbered log of every run attempt, including failures | User request | — | 800548a |
-| 2026-11-05 | S8 | Task 4: `src/attention/attention.py` (reference SDPA + tiled online-softmax), 52 correctness tests, `src/attention/benchmark.py` with `--smoke` | Task 4 requirements (E1–E3) | D-017 | (this commit) |
+| 2026-11-05 | S8 | Task 4: `src/attention/attention.py` (reference SDPA + tiled online-softmax), 52 correctness tests, `src/attention/benchmark.py` with `--smoke` | Task 4 requirements (E1–E3) | D-017 | d7008ea |
 
 ---
 
