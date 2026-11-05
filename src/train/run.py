@@ -14,7 +14,7 @@ import torch
 from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, set_seed
 
-from src.data.dataset import SFTDataset, collate, load_split_frames
+from src.data.dataset import SFTDataset, collate, load_split_frames, oversample
 from src.utils import git_commit, library_versions, load_config, load_env, wandb_enabled
 
 
@@ -39,19 +39,27 @@ def main():
     if args.model:
         cfg["model_id"] = args.model
     tc = cfg["train"]
+    pv = cfg["prompt_version"]
     set_seed(cfg["seed"])
     on_gpu = torch.cuda.is_available()
-    out_dir = Path(cfg["output_dir"] + ("-smoke" if args.smoke else ""))
+    out_dir = Path("outputs") / (cfg["run_name"] + ("-smoke" if args.smoke else ""))
 
     tok = AutoTokenizer.from_pretrained(cfg["model_id"])
     frames = load_split_frames()
     train_df, val_df = frames["train"], frames["val"]
+    os_cfg = tc.get("oversample")
+    if os_cfg:
+        n0 = len(train_df)
+        train_df = oversample(train_df, os_cfg["target"], os_cfg["max_factor"], cfg["seed"])
+        counts = train_df.groupby(["criterion_type", "expert_eligibility"]).size().to_dict()
+        print(f"oversampled train {n0} -> {len(train_df)}: {counts}")
     if args.smoke:
         train_df = smoke_subset(train_df, 16)
         val_df = val_df.head(8)
-    train_ds = SFTDataset(tok, train_df, cfg["max_len"])
-    val_ds = SFTDataset(tok, val_df, cfg["max_len"])
-    print(f"train={len(train_ds)} val={len(val_ds)} longest_train_seq={max(len(x['input_ids']) for x in train_ds.items)}")
+    train_ds = SFTDataset(tok, train_df, cfg["max_len"], pv)
+    val_ds = SFTDataset(tok, val_df, cfg["max_len"], pv)
+    print(f"run={cfg['run_name']} prompt={pv} train={len(train_ds)} val={len(val_ds)} "
+          f"longest_train_seq={max(len(x['input_ids']) for x in train_ds.items)}")
 
     model = AutoModelForCausalLM.from_pretrained(
         cfg["model_id"], dtype=torch.float16 if (on_gpu and tc["fp16"]) else torch.float32, attn_implementation="sdpa"
@@ -78,12 +86,14 @@ def main():
         per_device_train_batch_size=tc["per_device_batch_size"],
         per_device_eval_batch_size=tc["per_device_batch_size"],
         gradient_accumulation_steps=1 if args.smoke else tc["grad_accum"],
-        learning_rate=tc["lr"], warmup_steps=tc["warmup_ratio"],  # float in [0,1) = ratio in transformers v5 weight_decay=tc["weight_decay"],
+        learning_rate=tc["lr"],
+        warmup_steps=tc["warmup_ratio"],  # float in [0,1) = ratio in transformers v5
+        weight_decay=tc["weight_decay"],
         lr_scheduler_type=tc["lr_scheduler"],
         fp16=on_gpu and tc["fp16"],
         load_best_model_at_end=True, metric_for_best_model="eval_loss", greater_is_better=False,
         save_total_limit=2, seed=cfg["seed"], report_to=report_to,
-        run_name=("smoke-" if args.smoke else "") + Path(cfg["output_dir"]).name,
+        run_name=("smoke-" if args.smoke else "") + cfg["run_name"],
         remove_unused_columns=False, dataloader_num_workers=0,
         **(smoke_steps if args.smoke else full_steps),
     )
@@ -94,7 +104,7 @@ def main():
     final = out_dir / "final"
     trainer.save_model(str(final))
     tok.save_pretrained(str(final))
-    losses = [h for h in trainer.state.log_history if "loss" in h or "eval_loss" in h]
+    losses = [h for h in trainer.state.log_history if "loss" in h or "eval_loss" in h or "train_runtime" in h]
     meta = {"config": cfg, "smoke": args.smoke, "git_commit": git_commit(), "best_checkpoint": trainer.state.best_model_checkpoint,
             "best_eval_loss": trainer.state.best_metric, "log_history": losses,
             "precision": "fp16 AMP (fp32 adapters)" if targs.fp16 else "fp32",
@@ -113,7 +123,7 @@ def main():
         if on_gpu:
             torch.cuda.empty_cache()
         tok2, m2 = load_model(cfg["model_id"], str(final), torch.float16 if on_gpu else torch.float32, "cuda" if on_gpu else "cpu")
-        recs = predict_frame(tok2, m2, frames["val"].head(2), batch_size=2, max_new_tokens=64)
+        recs = predict_frame(tok2, m2, frames["val"].head(2), batch_size=2, max_new_tokens=64, prompt_version=pv)
         for r in recs:
             print("  gold:", r["gold_label"], r["gold_evidence"], "| raw:", r["raw"][:120])
         if on_gpu:

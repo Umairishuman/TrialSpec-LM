@@ -11,13 +11,22 @@ def load_split_frames() -> dict[str, pd.DataFrame]:
     return {name: g.reset_index(drop=True) for name, g in df.groupby("split")}
 
 
-def prompt_text(tokenizer, row) -> str:
-    msgs = build_messages(row["sentences"], row["criterion_type"], row["criterion_text"])
+def oversample(frame: pd.DataFrame, target: int, max_factor: int, seed: int) -> pd.DataFrame:
+    """Repeat rare (criterion_type, label) groups up to `target` rows, at most `max_factor` copies each."""
+    parts = []
+    for _, g in frame.groupby(["criterion_type", "expert_eligibility"]):
+        factor = min(max_factor, max(1, -(-target // len(g))))
+        parts.append(pd.concat([g] * factor))
+    return pd.concat(parts).sample(frac=1.0, random_state=seed).reset_index(drop=True)
+
+
+def prompt_text(tokenizer, row, prompt_version: str = "v2") -> str:
+    msgs = build_messages(row["sentences"], row["criterion_type"], row["criterion_text"], prompt_version)
     return tokenizer.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False)
 
 
-def encode_example(tokenizer, row, max_len: int) -> dict:
-    msgs = build_messages(row["sentences"], row["criterion_type"], row["criterion_text"])
+def encode_example(tokenizer, row, max_len: int, prompt_version: str = "v2") -> dict:
+    msgs = build_messages(row["sentences"], row["criterion_type"], row["criterion_text"], prompt_version)
     target = build_target(row["expert_eligibility"], row["expert_sentences"])
     prompt = tokenizer.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False)
     full = tokenizer.apply_chat_template(msgs + [{"role": "assistant", "content": target}], tokenize=False)
@@ -35,8 +44,8 @@ def encode_example(tokenizer, row, max_len: int) -> dict:
 
 
 class SFTDataset(torch.utils.data.Dataset):
-    def __init__(self, tokenizer, frame: pd.DataFrame, max_len: int):
-        self.items = [encode_example(tokenizer, r, max_len) for _, r in frame.iterrows()]
+    def __init__(self, tokenizer, frame: pd.DataFrame, max_len: int, prompt_version: str = "v2"):
+        self.items = [encode_example(tokenizer, r, max_len, prompt_version) for _, r in frame.iterrows()]
 
     def __len__(self):
         return len(self.items)

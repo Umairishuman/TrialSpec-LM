@@ -1,4 +1,7 @@
+# Run 1 (2026-11-05): first full run. Kept for reproducibility; see docs/runs.md.
+run_name: qwen2.5-1.5b-lora
 model_id: Qwen/Qwen2.5-1.5B-Instruct
+prompt_version: v1       # label names only, no definitions
 max_len: 1024            # longest prompt+target is ~640 tokens, so nothing is truncated
 seed: 42
 
@@ -19,7 +22,7 @@ train:
   gradient_checkpointing: true
   fp16: true             # T4 has no bf16; see docs/decisions.md D-002
   logging_steps: 5
+  oversample: null
 
-output_dir: outputs/qwen2.5-1.5b-lora
 wandb_project: trialspec-lm
-hub_repo: umairishuman/trialspec-qwen2.5-1.5b-lora   # adapter upload target (skipped in smoke mode)
+hub_repo: umairishuman/trialspec-qwen2.5-1.5b-lora

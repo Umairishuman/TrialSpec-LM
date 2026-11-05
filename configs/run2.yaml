@@ -1,0 +1,30 @@
+# Run 2: label definitions in the prompt + oversampling of rare labels. Everything else = run 1.
+run_name: run2-v2prompt-oversample
+model_id: Qwen/Qwen2.5-1.5B-Instruct
+prompt_version: v2       # adds one-line definition per label (src/data/prompt.py)
+max_len: 1024
+seed: 42
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+train:
+  epochs: 3
+  lr: 2.0e-4
+  per_device_batch_size: 4
+  grad_accum: 4
+  warmup_ratio: 0.05
+  weight_decay: 0.0
+  lr_scheduler: cosine
+  gradient_checkpointing: true
+  fp16: true
+  logging_steps: 5
+  oversample:            # repeat each (type, label) group up to `target` rows, at most `max_factor` copies
+    target: 60
+    max_factor: 4
+
+wandb_project: trialspec-lm
+hub_repo: umairishuman/trialspec-qwen2.5-1.5b-lora-run2

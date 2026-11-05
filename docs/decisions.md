@@ -27,6 +27,11 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-05 | S5 | 2nd Kaggle run: GPU + tests OK, smoke failed at LoRA injection. Added `scripts/kaggle_setup.sh` (installs deps, uninstalls torchao, self-checks peft); notebook calls it | peft 0.21 rejects Kaggle's preinstalled torchao 0.10 | D-014 | b156f63 |
 | 2026-11-05 | S4/S5 | **Run 1 complete** (Kaggle T4, commit 29b1596): zero-shot baseline + LoRA fine-tune + val predictions; adapter on HF Hub; results copied to `results/` | First full pipeline run | D-015 | a8b846d |
 | 2026-11-05 | S4 | Fixed output filenames: `with_suffix` truncated `qwen2.5-1.5b_val` → `qwen2.5-1.jsonl` | Found in run 1 outputs | D-015 | a8b846d |
+| 2026-11-05 | S4 | Prompt versioning: v1 (names only, run 1) kept; v2 adds a one-line definition per label | Degenerate zero-shot baseline in run 1 | D-016 | (pending) |
+| 2026-11-05 | S5 | Optional per-group oversampling (`train.oversample`: target 60, max 4×) | Rare-class collapse in run 1 | D-016 | (pending) |
+| 2026-11-05 | S5 | Restored `weight_decay` argument accidentally commented out by the D-012 edit | Found while reviewing `run.py`; no effect on run 1 (0.0 = default) | D-016 | (pending) |
+| 2026-11-05 | S1/S5 | Configs are now per run (`configs/run1.yaml`, `configs/run2.yaml`) with `run_name`; Kaggle steps moved to `scripts/kaggle_pipeline.sh`; notebook reduced to choosing `CONFIG` | A new experiment shouldn't need notebook edits | D-016 | (pending) |
+| 2026-11-05 | S1 | Added `docs/runs.md`: numbered log of every run attempt, including failures | User request | — | (pending) |
 
 ---
 
@@ -148,3 +153,11 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 3. **Fine-tuned minority classes collapse:** F1 is 0 for "not included" (3 examples), "excluded" (2) and inclusion "not applicable" (1). Exclusion "not enough information" recall is only 0.19; 19 of 26 are predicted as the majority class "not excluded". Imbalance (D-006) is the main limitation.
 4. 0 parse failures and 0 hallucinated sentence IDs after fine-tuning. Inference takes 36 s for 206 examples on a T4.
 **Status:** accepted (results); improvements proposed in the next entry
+
+## D-016: Run 2 design: label definitions + rare-label oversampling (2026-11-05)
+**Context:** Run 1 had a degenerate zero-shot baseline and rare-class collapse (D-015).
+**Evidence used for the label definitions (train split):** fraction of annotations with *no* gold evidence: exclusion "not excluded" 0.75, "not applicable" 0.83, "not enough information" 0.69, "excluded" 0.00; inclusion "included" 0.06, "not included" 0.23, "not enough information" 0.50, "not applicable" 0.80. So experts label "not excluded" when the excluding condition is *not reported*, and "not applicable" covers criteria about other populations or study procedures (e.g. "MRI images unable to be processed").
+**Options considered for imbalance:** (a) class-weighted token loss: awkward with generative targets, since the label is spread over several tokens; (b) oversampling rare (type, label) groups; (c) focal loss: same problem as (a); (d) do nothing and report it.
+**Decision:** prompt v2 with definitions that match that convention. Oversample to 60 rows per group, capped at 4×, so a 5-example group isn't repeated 12 times (memorisation risk). Validation is the only selection signal; the test set stays untouched.
+**Tension to discuss in the report:** the assignment says absent evidence must never be treated as proof. The expert labels, however, map "condition not reported" to "not excluded". We follow the gold convention for the metrics, and the app will flag such decisions as "no supporting evidence cited" rather than presenting them as confirmed.
+**Status:** accepted (results in docs/runs.md, attempt 4)
