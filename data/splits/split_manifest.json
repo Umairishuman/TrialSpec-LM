@@ -1,0 +1,184 @@
+{
+  "dataset": "ncbi/TrialGPT-Criterion-Annotations",
+  "procedure": "sorted unique patient_id -> numpy default_rng(42).shuffle -> first 37 train, next 8 val, last 8 test",
+  "seed": 42,
+  "created_utc": "2026-11-05T09:27:10+00:00",
+  "total_patients": 53,
+  "total_annotations": 1015,
+  "splits": {
+    "train": {
+      "patient_ids": [
+        "sigir-20148",
+        "sigir-201416",
+        "sigir-201517",
+        "sigir-201519",
+        "sigir-20159",
+        "sigir-201425",
+        "sigir-201414",
+        "sigir-20157",
+        "sigir-201514",
+        "sigir-20144",
+        "sigir-20152",
+        "sigir-20151",
+        "sigir-201429",
+        "sigir-201426",
+        "sigir-20145",
+        "sigir-201518",
+        "sigir-20154",
+        "sigir-201521",
+        "sigir-201413",
+        "sigir-20146",
+        "sigir-201511",
+        "sigir-20147",
+        "sigir-20155",
+        "sigir-201418",
+        "sigir-20156",
+        "sigir-20143",
+        "sigir-20149",
+        "sigir-201523",
+        "sigir-201424",
+        "sigir-201524",
+        "sigir-201512",
+        "sigir-201423",
+        "sigir-201412",
+        "sigir-201510",
+        "sigir-201419",
+        "sigir-201520",
+        "sigir-20153"
+      ],
+      "n_patients": 37,
+      "n_annotations": 603,
+      "n_annotations_per_patient": {
+        "sigir-201412": 9,
+        "sigir-201413": 12,
+        "sigir-201414": 14,
+        "sigir-201416": 30,
+        "sigir-201418": 12,
+        "sigir-201419": 25,
+        "sigir-201423": 23,
+        "sigir-201424": 6,
+        "sigir-201425": 21,
+        "sigir-201426": 18,
+        "sigir-201429": 22,
+        "sigir-20143": 6,
+        "sigir-20144": 43,
+        "sigir-20145": 11,
+        "sigir-20146": 22,
+        "sigir-20147": 17,
+        "sigir-20148": 12,
+        "sigir-20149": 5,
+        "sigir-20151": 29,
+        "sigir-201510": 15,
+        "sigir-201511": 11,
+        "sigir-201512": 9,
+        "sigir-201514": 15,
+        "sigir-201517": 15,
+        "sigir-201518": 10,
+        "sigir-201519": 7,
+        "sigir-20152": 20,
+        "sigir-201520": 21,
+        "sigir-201521": 21,
+        "sigir-201523": 25,
+        "sigir-201524": 32,
+        "sigir-20153": 16,
+        "sigir-20154": 11,
+        "sigir-20155": 5,
+        "sigir-20156": 9,
+        "sigir-20157": 18,
+        "sigir-20159": 6
+      },
+      "label_counts": {
+        "exclusion": {
+          "excluded": 8,
+          "not applicable": 23,
+          "not enough information": 65,
+          "not excluded": 292
+        },
+        "inclusion": {
+          "included": 88,
+          "not applicable": 5,
+          "not enough information": 109,
+          "not included": 13
+        }
+      },
+      "n_empty_gold_evidence": 349
+    },
+    "val": {
+      "patient_ids": [
+        "sigir-201415",
+        "sigir-20142",
+        "sigir-201430",
+        "sigir-201427",
+        "sigir-201515",
+        "sigir-20141",
+        "sigir-201420",
+        "sigir-201522"
+      ],
+      "n_patients": 8,
+      "n_annotations": 206,
+      "n_annotations_per_patient": {
+        "sigir-20141": 31,
+        "sigir-201415": 39,
+        "sigir-20142": 12,
+        "sigir-201420": 17,
+        "sigir-201427": 20,
+        "sigir-201430": 29,
+        "sigir-201515": 29,
+        "sigir-201522": 29
+      },
+      "label_counts": {
+        "exclusion": {
+          "excluded": 2,
+          "not applicable": 11,
+          "not enough information": 26,
+          "not excluded": 101
+        },
+        "inclusion": {
+          "included": 35,
+          "not applicable": 1,
+          "not enough information": 27,
+          "not included": 3
+        }
+      },
+      "n_empty_gold_evidence": 116
+    },
+    "test": {
+      "patient_ids": [
+        "sigir-201422",
+        "sigir-20158",
+        "sigir-201411",
+        "sigir-201516",
+        "sigir-201513",
+        "sigir-201410",
+        "sigir-201421",
+        "sigir-201417"
+      ],
+      "n_patients": 8,
+      "n_annotations": 206,
+      "n_annotations_per_patient": {
+        "sigir-201410": 26,
+        "sigir-201411": 15,
+        "sigir-201417": 23,
+        "sigir-201421": 34,
+        "sigir-201422": 16,
+        "sigir-201513": 42,
+        "sigir-201516": 28,
+        "sigir-20158": 22
+      },
+      "label_counts": {
+        "exclusion": {
+          "not applicable": 12,
+          "not enough information": 28,
+          "not excluded": 91
+        },
+        "inclusion": {
+          "included": 27,
+          "not applicable": 3,
+          "not enough information": 38,
+          "not included": 7
+        }
+      },
+      "n_empty_gold_evidence": 145
+    }
+  }
+}
