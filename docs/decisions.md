@@ -23,7 +23,8 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-05 | S5 | Kaggle notebook changed to run the full training automatically once smoke tests pass | One "Save & Run All" per experiment | D-012 | 316e638 |
 | 2026-11-05 | S5 | First Kaggle run failed: no GPU selected (`torch+cpu`). Added in-kernel GPU check with fix-it message | Accelerator not set before commit | D-013 | e8ec91e |
 | 2026-11-05 | S5 | Stopped pinning numpy/pandas; versions now logged per run | pip conflicts with Kaggle's preinstalled packages | D-013 | e8ec91e |
-| 2026-11-05 | S10 | Planned app hosting changed from laptop to free HF Space (CPU, 16 GB) | Laptop RAM too small for 1.5B + 0.5B draft | D-014 (to be written at S10) | — |
+| 2026-11-05 | S10 | Planned app hosting changed from laptop to free HF Space (CPU, 16 GB) | Laptop RAM too small for 1.5B + 0.5B draft | to be written at S10 | — |
+| 2026-11-05 | S5 | 2nd Kaggle run: GPU + tests OK, smoke failed at LoRA injection. Added `scripts/kaggle_setup.sh` (installs deps, uninstalls torchao, self-checks peft); notebook calls it | peft 0.21 rejects Kaggle's preinstalled torchao 0.10 | D-014 | (this commit) |
 
 ---
 
@@ -121,4 +122,11 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 **What happened:** The first committed Kaggle version ran on the CPU image (`torch 2.11.0+cpu`) because no accelerator was selected. The GPU check in the notebook failed after about 2 minutes, before any training, which is what it is for. pip also reported conflicts: pinning `numpy==2.5.4`/`pandas==3.1.1` replaced Kaggle's preinstalled builds (numba requires numpy<2.3; google-colab requires pandas==2.2.3).
 **Decision:** Pin only the ML stack (`transformers`, `peft`, `accelerate`, `datasets`). Use the platform's `torch`/`numpy`/`pandas`, and record their exact versions in every run's metadata instead. The notebook now checks for a GPU in the kernel and fails with a clear message telling you how to fix it.
 **Why:** Overriding the platform's numerical libraries risks binary incompatibilities. Logging the versions keeps reproducibility.
+**Status:** accepted
+
+## D-014: torchao conflict, and moving environment setup into the repo (2026-11-05)
+**What happened:** The 2nd Kaggle run reached `get_peft_model` and failed with `ImportError: Found an incompatible version of torchao. Found version 0.10.0, but only versions above 0.16.0 are supported`. peft probes torchao whenever it is installed.
+**Options considered:** (a) upgrade torchao: it must match the torch build (2.11+cu130), which risks another conflict; (b) pin an older peft: loses fixes and diverges from the locally tested version; (c) uninstall torchao, which this project never uses.
+**Decision:** (c). The setup now lives in `scripts/kaggle_setup.sh`, which installs the requirements, uninstalls torchao and runs a tiny LoRA injection as a self-check. The notebook only calls this script.
+**Why:** It's the smallest change. Future environment fixes reach Kaggle through `git pull` with no notebook re-import, and the self-check fails within seconds, before any model download.
 **Status:** accepted
