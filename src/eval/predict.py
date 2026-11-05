@@ -11,7 +11,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from src.data.dataset import load_split_frames, prompt_text
 from src.data.prompt import parse_output
 from src.eval.metrics import full_report
-from src.utils import git_commit, load_env
+from src.utils import git_commit, library_versions, load_env
 
 
 def load_model(model_id: str, adapter: str | None, dtype: torch.dtype, device: str):
@@ -82,7 +82,8 @@ def main():
     meta = {
         "model": args.model, "adapter": args.adapter, "split": args.split, "n": len(records),
         "decoding": {"strategy": "greedy", "do_sample": False, "max_new_tokens": args.max_new_tokens, "batch_size": args.batch_size},
-        "dtype": str(dtype), "device": device, "git_commit": git_commit(),
+        "dtype": str(dtype), "device": torch.cuda.get_device_name(0) if device == "cuda" else "cpu",
+        "git_commit": git_commit(), "versions": library_versions(),
         "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"), "seconds": round(elapsed, 1),
         "parse_ok_rate": sum(r["parse_ok"] for r in records) / max(len(records), 1),
     }

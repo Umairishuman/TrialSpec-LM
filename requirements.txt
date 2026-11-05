@@ -1,14 +1,13 @@
-# Versions verified locally on 2026-11-05.
-# torch is NOT listed: use the platform's CUDA build (Kaggle preinstalls it).
+# ML stack pinned (versions verified locally and on Kaggle, 2026-11-05).
+# torch, numpy and pandas are NOT pinned: use the platform's builds (Kaggle preinstalls CUDA torch);
+# the exact versions used are recorded in each run's training_meta.json / metrics.json.
 # Locally: pip install torch --index-url https://download.pytorch.org/whl/cpu   (or the CUDA wheel)
 datasets==5.1.0
-pandas==3.1.1
-numpy==2.5.4
 transformers==5.22.1
 peft==0.21.2
 accelerate==1.15.0
-scikit-learn==1.9.1
-wandb==0.31.0
+scikit-learn
+wandb
 python-dotenv
 pyyaml
 pytest

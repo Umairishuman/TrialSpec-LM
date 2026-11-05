@@ -15,7 +15,7 @@ from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, set_seed
 
 from src.data.dataset import SFTDataset, collate, load_split_frames
-from src.utils import git_commit, load_config, load_env, wandb_enabled
+from src.utils import git_commit, library_versions, load_config, load_env, wandb_enabled
 
 
 def smoke_subset(frame, n: int):
@@ -97,7 +97,9 @@ def main():
     losses = [h for h in trainer.state.log_history if "loss" in h or "eval_loss" in h]
     meta = {"config": cfg, "smoke": args.smoke, "git_commit": git_commit(), "best_checkpoint": trainer.state.best_model_checkpoint,
             "best_eval_loss": trainer.state.best_metric, "log_history": losses,
-            "precision": "fp16 AMP (fp32 adapters)" if targs.fp16 else "fp32"}
+            "precision": "fp16 AMP (fp32 adapters)" if targs.fp16 else "fp32",
+            "versions": library_versions(),
+            "device": torch.cuda.get_device_name(0) if on_gpu else "cpu"}
     (final / "training_meta.json").write_text(json.dumps(meta, indent=2, default=str))
     print(f"saved adapter -> {final} (best eval_loss={trainer.state.best_metric})")
 

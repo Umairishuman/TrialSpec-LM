@@ -24,5 +24,16 @@ def git_commit() -> str:
         return "unknown"
 
 
+def library_versions() -> dict:
+    from importlib.metadata import PackageNotFoundError, version
+    out = {}
+    for pkg in ["torch", "transformers", "peft", "accelerate", "datasets", "numpy", "pandas", "scikit-learn"]:
+        try:
+            out[pkg] = version(pkg)
+        except PackageNotFoundError:
+            out[pkg] = None
+    return out
+
+
 def wandb_enabled() -> bool:
     return bool(os.environ.get("WANDB_API_KEY"))
