@@ -1,0 +1,25 @@
+model_id: Qwen/Qwen2.5-1.5B-Instruct
+max_len: 1024            # longest prompt+target is ~640 tokens, so nothing is truncated
+seed: 42
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+train:
+  epochs: 3
+  lr: 2.0e-4
+  per_device_batch_size: 4
+  grad_accum: 4          # effective batch 16
+  warmup_ratio: 0.05
+  weight_decay: 0.0
+  lr_scheduler: cosine
+  gradient_checkpointing: true
+  fp16: true             # T4 has no bf16; see docs/decisions.md D-002
+  logging_steps: 5
+
+output_dir: outputs/qwen2.5-1.5b-lora
+wandb_project: trialspec-lm
+hub_repo: umairishuman/trialspec-qwen2.5-1.5b-lora   # adapter upload target (skipped in smoke mode)
