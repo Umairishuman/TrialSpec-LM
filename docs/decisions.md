@@ -1,10 +1,10 @@
-# Decision Log
+﻿# Decision Log
 
 Two parts:
 1. **Changelog:** what changed, at which project stage, and why (one row per change, newest at the bottom).
 2. **Decisions:** the full reasoning for each architectural or technical decision (D-XXX), referenced from the changelog.
 
-Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/model choice · S4 Baseline · S5 Fine-tuning · S6 Eval (Task 2) · S7 KV cache (Task 3) · S8 Tiled attention (Task 4) · S9 Speculative decoding (Task 5) · S10 App (Task 6) · S11 Report · S12 Submission.
+Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup Â· S2 Dataset/split Â· S3 Research/model choice Â· S4 Baseline Â· S5 Fine-tuning Â· S6 Eval (Task 2) Â· S7 KV cache (Task 3) Â· S8 Tiled attention (Task 4) Â· S9 Speculative decoding (Task 5) Â· S10 App (Task 6) Â· S11 Report Â· S12 Submission.
 
 ---
 
@@ -12,19 +12,19 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 
 | Date | Stage | Change | Reason / trigger | Ref | Commit |
 |---|---|---|---|---|---|
-| 2026-11-05 | S1 | Created plan, CLAUDE.md and decision log | Project kickoff | D-001–D-003 | 51ef949 |
+| 2026-11-05 | S1 | Created plan, CLAUDE.md and decision log | Project kickoff | D-001â€“D-003 | 51ef949 |
 | 2026-11-05 | S2 | Dataset loader drops GPT-4 columns + `explanation_correctness` + `training` | Leakage rule (B2) | D-005 | 51ef949 |
 | 2026-11-05 | S2 | Fixed 37/8/8 split + manifest + 9 leakage/split tests | Prescribed protocol (B1) | D-006 | 51ef949 |
-| 2026-11-05 | S3 | Model candidates narrowed to Qwen2.5-1.5B target / 0.5B draft; 3B rejected | 3B license is not Apache; identical tokenizer verified | D-004 → D-008 | 834516d |
+| 2026-11-05 | S3 | Model candidates narrowed to Qwen2.5-1.5B target / 0.5B draft; 3B rejected | 3B license is not Apache; identical tokenizer verified | D-004 â†’ D-008 | 834516d |
 | 2026-11-05 | S4 | Output schema `{"evidence_ids", "label"}`; no free-text explanation training | Dataset has no expert explanations; GPT-4 ones forbidden | D-009 | 834516d |
 | 2026-11-05 | S5 | `max_len=1024`, no truncation (longest example 625 tokens) | Measured token lengths | D-008 | 834516d |
-| 2026-11-05 | S5 | `warmup_ratio` → float `warmup_steps` | Local CPU smoke test crashed: removed in transformers 5.22 | D-012 | 834516d |
-| 2026-11-05 | S5 | Local CPU smoke training abandoned; all model runs moved to Kaggle | Laptop has 16 GB RAM, no NVIDIA GPU; CPU run was killed after step 5 | D-012 | — |
+| 2026-11-05 | S5 | `warmup_ratio` â†’ float `warmup_steps` | Local CPU smoke test crashed: removed in transformers 5.22 | D-012 | 834516d |
+| 2026-11-05 | S5 | Local CPU smoke training abandoned; all model runs moved to Kaggle | Laptop has 16 GB RAM, no NVIDIA GPU; CPU run was killed after step 5 | D-012 | â€” |
 | 2026-11-05 | S5 | Kaggle notebook changed to run the full training automatically once smoke tests pass | One "Save & Run All" per experiment | D-012 | 316e638 |
 | 2026-11-05 | S5 | First Kaggle run failed: no GPU selected (`torch+cpu`). Added in-kernel GPU check with fix-it message | Accelerator not set before commit | D-013 | e8ec91e |
 | 2026-11-05 | S5 | Stopped pinning numpy/pandas; versions now logged per run | pip conflicts with Kaggle's preinstalled packages | D-013 | e8ec91e |
-| 2026-11-05 | S10 | Planned app hosting changed from laptop to free HF Space (CPU, 16 GB) | Laptop RAM too small for 1.5B + 0.5B draft | to be written at S10 | — |
-| 2026-11-05 | S5 | 2nd Kaggle run: GPU + tests OK, smoke failed at LoRA injection. Added `scripts/kaggle_setup.sh` (installs deps, uninstalls torchao, self-checks peft); notebook calls it | peft 0.21 rejects Kaggle's preinstalled torchao 0.10 | D-014 | (this commit) |
+| 2026-11-05 | S10 | Planned app hosting changed from laptop to free HF Space (CPU, 16 GB) | Laptop RAM too small for 1.5B + 0.5B draft | to be written at S10 | â€” |
+| 2026-11-05 | S5 | 2nd Kaggle run: GPU + tests OK, smoke failed at LoRA injection. Added `scripts/kaggle_setup.sh` (installs deps, uninstalls torchao, self-checks peft); notebook calls it | peft 0.21 rejects Kaggle's preinstalled torchao 0.10 | D-014 | b156f63 |
 
 ---
 
@@ -70,14 +70,14 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 **Status:** accepted
 
 ## D-006: Prescribed split and observed class imbalance (2026-11-05)
-**Context:** 1,015 annotations from 53 patients (all `sigir-*`). The split is sorted IDs → `default_rng(42).shuffle` → 37/8/8.
+**Context:** 1,015 annotations from 53 patients (all `sigir-*`). The split is sorted IDs â†’ `default_rng(42).shuffle` â†’ 37/8/8.
 **Result:** train 37 patients / 603 annotations, val 8 / 206, test 8 / 206. Manifest: `data/splits/split_manifest.json`. Tests cover disjointness, one split per patient, determinism and manifest match.
 **Observed issue:** Severe imbalance. "excluded" has 10 examples in total (train 8, val 2, **test 0**). "not included" has 23. "not applicable" (inclusion) has 9.
 **Consequences:** Accuracy is dominated by "not excluded". Macro-F1 must be the headline metric. The "excluded" per-class metrics are undefined on test and must be reported as N/A, with no sample made up to fill the gap. Weighting the training loss by class could be considered, and must be tuned only on val.
 **Status:** accepted
 
 ## D-007: Note parsing and truncation (2026-11-05)
-**Context:** Each note line is `"<id>. <sentence>"`. All 1,015 notes parse, sentence IDs are sequential from 0, and all expert evidence IDs exist in their note. Note length is 370–1,447 characters (median 579).
+**Context:** Each note line is `"<id>. <sentence>"`. All 1,015 notes parse, sentence IDs are sequential from 0, and all expert evidence IDs exist in their note. Note length is 370â€“1,447 characters (median 579).
 **Decision:** Keep the original sentence IDs from the note text and present the note to the model with those IDs. Truncation is expected to be unnecessary, because the longest note is about 400 tokens. Confirm with the tokenizer when the model is chosen.
 **Empty evidence:** 610/1,015 annotations (60%) have no gold evidence (train 349, val 116, test 145). The empty-set rule for the evidence metrics is decided in the Task 2 entry.
 **Status:** accepted (token count to be confirmed)
@@ -92,7 +92,7 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 
 The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, checked programmatically.
 **Decision:** Target = Qwen2.5-1.5B-Instruct, draft = Qwen2.5-0.5B-Instruct. The 3B model is rejected because of its non-Apache license and tighter T4 memory. Llama-3.2 is rejected because it is gated.
-**Token lengths (Qwen tokenizer + chat template):** prompts are 227–597 tokens (median 297, p95 455), and targets are 12–38 tokens. With `max_len=1024`, **no example is truncated**. The code raises an error instead of silently truncating.
+**Token lengths (Qwen tokenizer + chat template):** prompts are 227â€“597 tokens (median 297, p95 455), and targets are 12â€“38 tokens. With `max_len=1024`, **no example is truncated**. The code raises an error instead of silently truncating.
 **Status:** accepted
 
 ## D-009: Output schema, and why the model does not generate free-text explanations (2026-11-05)
@@ -109,7 +109,7 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 ## D-011: Metric definitions (2026-11-05)
 - **Labels:** inclusion and exclusion are evaluated separately, each with its own 4-label set. "Overall" pools them over the union of labels. Unparseable outputs count as the extra class `<invalid>`; they are always wrong and reported as `invalid_rate`.
 - **Macro-F1** is averaged over classes present in the gold labels of that subset. Absent classes (e.g. "excluded" on test) are shown as N/A.
-- **Evidence:** set-based P/R/F1 over sentence IDs. Per record: both sets empty → P=R=F1=1; one side empty → 0. Macro averages per-record scores; micro pools TP/FP/FN, so both-empty records don't contribute. Cited IDs that are not in the note are dropped and counted (`invalid_ids`).
+- **Evidence:** set-based P/R/F1 over sentence IDs. Per record: both sets empty â†’ P=R=F1=1; one side empty â†’ 0. Macro averages per-record scores; micro pools TP/FP/FN, so both-empty records don't contribute. Cited IDs that are not in the note are dropped and counted (`invalid_ids`).
 - Covered by `tests/test_metrics.py`.
 **Status:** accepted
 
