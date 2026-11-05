@@ -88,10 +88,11 @@ def main():
         "parse_ok_rate": sum(r["parse_ok"] for r in records) / max(len(records), 1),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    with open(args.out.with_suffix(".jsonl"), "w") as f:
+    # Append suffixes instead of with_suffix(): names like "qwen2.5-1.5b_val" contain dots.
+    with open(f"{args.out}.jsonl", "w") as f:
         for r in records:
             f.write(json.dumps(r) + "\n")
-    args.out.with_suffix(".metrics.json").write_text(json.dumps({"meta": meta, "metrics": report}, indent=2))
+    Path(f"{args.out}.metrics.json").write_text(json.dumps({"meta": meta, "metrics": report}, indent=2))
 
     o = report["overall"]
     print(f"accuracy={o['accuracy']:.3f} macro_f1={o['macro_f1']:.3f} parse_ok={meta['parse_ok_rate']:.3f} "

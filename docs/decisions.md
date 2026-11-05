@@ -25,6 +25,8 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-05 | S5 | Stopped pinning numpy/pandas; versions now logged per run | pip conflicts with Kaggle's preinstalled packages | D-013 | e8ec91e |
 | 2026-11-05 | S10 | Planned app hosting changed from laptop to free HF Space (CPU, 16 GB) | Laptop RAM too small for 1.5B + 0.5B draft | to be written at S10 | — |
 | 2026-11-05 | S5 | 2nd Kaggle run: GPU + tests OK, smoke failed at LoRA injection. Added `scripts/kaggle_setup.sh` (installs deps, uninstalls torchao, self-checks peft); notebook calls it | peft 0.21 rejects Kaggle's preinstalled torchao 0.10 | D-014 | b156f63 |
+| 2026-11-05 | S4/S5 | **Run 1 complete** (Kaggle T4, commit 29b1596): zero-shot baseline + LoRA fine-tune + val predictions; adapter on HF Hub; results copied to `results/` | First full pipeline run | D-015 | (this commit) |
+| 2026-11-05 | S4 | Fixed output filenames: `with_suffix` truncated `qwen2.5-1.5b_val` → `qwen2.5-1.jsonl` | Found in run 1 outputs | D-015 | (this commit) |
 
 ---
 
@@ -130,3 +132,19 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 **Decision:** (c). The setup now lives in `scripts/kaggle_setup.sh`, which installs the requirements, uninstalls torchao and runs a tiny LoRA injection as a self-check. The notebook only calls this script.
 **Why:** It's the smallest change. Future environment fixes reach Kaggle through `git pull` with no notebook re-import, and the self-check fails within seconds, before any model download.
 **Status:** accepted
+
+## D-015: Run 1 results (validation split only) and what they reveal (2026-11-05)
+**Setup:** Qwen2.5-1.5B-Instruct, LoRA r=16/α=32 on all attention+MLP projections, lr 2e-4 cosine, 3 epochs, effective batch 16, fp16 AMP on a Tesla T4, commit 29b1596. Greedy decoding, max 64 new tokens, batch 8. Adapter: `huggingface.co/umairishuman/trialspec-qwen2.5-1.5b-lora`.
+**Training:** val loss 0.1315 (epoch 1) → **0.1146 (epoch 2, selected)** → 0.1201 (epoch 3; mild overfitting). Train loss 0.29 → 0.05. fp16 was stable, so the D-002 fallback was not needed.
+
+| Val (n=206) | Acc | Macro-F1 | Incl. Macro-F1 | Excl. Macro-F1 | Evid. micro-F1 | Evid. macro-F1 | Parse OK |
+|---|---|---|---|---|---|---|---|
+| Zero-shot | 0.068 | 0.054 | 0.064 | 0.074 | 0.000 | 0.563 | 100% |
+| LoRA run 1 | **0.743** | **0.432** | 0.360 | 0.401 | **0.554** | 0.745 | 100% |
+
+**Findings:**
+1. **The baseline is degenerate:** it cites no evidence for any of the 206 examples and predicts "not applicable" 138 times. The prompt names the labels but never *defines* them, so the untuned model can't tell, for example, "excluded" (meets the exclusion criterion) from "not excluded". This is a prompt-design weakness that makes the before/after comparison look lopsided.
+2. **The empty-set rule inflates macro evidence F1:** the baseline gets macro-F1 0.563 purely by predicting empty sets, since 116 of 206 gold sets are empty. **Report micro-F1 as the main evidence metric**, and macro alongside it with this caveat.
+3. **Fine-tuned minority classes collapse:** F1 is 0 for "not included" (3 examples), "excluded" (2) and inclusion "not applicable" (1). Exclusion "not enough information" recall is only 0.19; 19 of 26 are predicted as the majority class "not excluded". Imbalance (D-006) is the main limitation.
+4. 0 parse failures and 0 hallucinated sentence IDs after fine-tuning. Inference takes 36 s for 206 examples on a T4.
+**Status:** accepted (results); improvements proposed in the next entry
