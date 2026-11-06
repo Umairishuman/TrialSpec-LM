@@ -14,7 +14,7 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 5 | 2026-11-05 | Laptop CPU | attention benchmark (fp32) / d7008ea | **Success** | Tiled = reference within ~1e-6; 4096× smaller score buffer; slower than fused SDPA |
 | 6 | 2026-11-06 | Kaggle T4 | run3 / 7080257 | Planned | — |
 | 7 | 2026-11-06 | Laptop CPU | Task 3 KV-cache verification / 0d8f427 | **Success** | Manual decoder = HF to 3e-5 (fp32); all 4 decoding paths token-identical |
-| 8 | 2026-11-06 | Laptop CPU | Task 5 speculative verification / (this commit) | **Success** (after 2 test-design fixes) | 1.5B/0.5B bf16: tokens identical to greedy, acceptance 50–58%, 0.7× speed on CPU |
+| 8 | 2026-11-06 | Laptop CPU | Task 5 speculative verification / 3a2e7a6 | **Success** (after 2 test-design fixes) | 1.5B/0.5B bf16: tokens identical to greedy, acceptance 50–58%, 0.7× speed on CPU |
 
 ---
 
