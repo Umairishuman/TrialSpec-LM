@@ -37,6 +37,9 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-06 | S5 | Checkpoint selection by **val macro-F1** from generation (`src/eval/select_checkpoint.py`, `select_by` in config, `save_total_limit` configurable); pipeline evaluates each epoch checkpoint; smoke stage now loads a raw checkpoint | Val loss disagrees with the reported metric | D-018 | 7080257 |
 | 2026-11-06 | S5 | `configs/run3.yaml`: prompt v2, no oversampling, F1-based selection | Remove run 2's confound; fix selection | D-018 | 7080257 |
 | 2026-11-06 | S6/S11 | `src/eval/compare.py`: markdown comparison table of metrics files | Report and run-log tables | — | 7080257 |
+| 2026-11-06 | S5 | Fixed `results/smoke` committed as a file (copy into a missing folder); ignore `results-*.zip` | Noticed in `git status` | — | fea194a |
+| 2026-11-06 | S7 | Task 3: hand-written Qwen2 decoder with explicit `KVCache` (`src/decoding/manual_decoder.py`), three explicit greedy loops (`src/decoding/generate.py`), 15 tests (tiny random Qwen2 in fp64 + gated real-model test), benchmark with mismatch diagnosis (`src/decoding/benchmark_kv.py`) | Task 3 requirements (D1–D3) | D-019 | (this commit) |
+| 2026-11-06 | S7/S8 | `scripts/kaggle_benchmarks.sh` (smoke first, then attention fp16/fp32 and KV benchmarks); notebook runs it with `CONFIG = 'benchmarks'` | GPU numbers for Tasks 3–5 in one Kaggle run | D-019 | (this commit) |
 
 ---
 
@@ -186,3 +189,14 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 **Run 3 design:** prompt v2 *without* oversampling, removing run 2's confound so run 3 vs run 1 isolates the prompt. Oversampling stays off for now; if run 3 still shows rare-class collapse, a later run can re-test oversampling with F1 selection.
 **Consequences:** 3 × ~36 s extra evaluation per run, and about 3 × 150 MB of checkpoints on Kaggle disk (fine).
 **Status:** accepted (results in docs/runs.md, attempt 6)
+## D-019: Task 3 KV-cache design (2026-11-06)
+**Context:** Rubric D1 requires model forward passes with explicit cache reuse and update, causal masking and positional handling, "not only `use_cache=True`". D2 requires greedy-token equivalence with an uncached reference over at least 3 input and output lengths. D3 requires prefill/decode/tokens-per-second/peak-memory measurements with warm-up and synchronised repeats.
+**Options considered:** (a) `model.generate(use_cache=True/False)`: explicitly insufficient; (b) an explicit loop over the HF forward with a `DynamicCache`: shows the decoding flow, but the cache internals stay inside HF; (c) a hand-written decoder forward with our own cache tensors.
+**Decision:** implement both (b) and (c), and check both against the uncached reference.
+- **Positions:** RoPE is applied to each new key at its *absolute* position (`cache.length + t`) before it is written, so cached keys are never re-rotated. In (b) the same thing is done by passing `position_ids = [[cache_len]]` explicitly.
+- **Masking:** prefill uses the causal mask. A single decode query may see every cached key, so no mask entries are needed. This is the Task 4 offset convention (offset = Lk − Lq), so the same attention function serves both phases. In (b) the attention mask covers past + new tokens.
+- **Cache growth:** preallocated `[B, n_kv, capacity, head_dim]` per layer for K and V; `write` fills `[length, length+T)`, `advance` commits, `crop` rolls back (needed for Task 5). Memory = 2 × layers × kv_heads × head_dim × bytes per token, so Qwen2.5-1.5B in fp16 uses 2·28·2·128·2 = **28 KiB/token**. GQA cuts this 6× (2 KV heads instead of 12).
+- **Numerical differences:** in fp16 on GPU, a cached decode step computes 1×L attention while the uncached path computes the last row of an L×L matrix with different kernels and reduction orders. Logits can differ in the last bits, and a greedy argmax can flip when the top-2 logits nearly tie. The benchmark records the reference top-1/top-2 margin at the first mismatch to tell a near-tie from a bug.
+- **Tests:** a tiny random Qwen2 (3 layers, GQA 4/2) in fp64 runs in seconds with no download, so it runs on Kaggle and in CI. A real-model test is gated by `RUN_MODEL_TESTS=1`.
+**Limitations:** batch size 1 (no padding) for the manual decoder; RoPE implemented for `rope_type=default` only (true for Qwen2.5), with an assertion guarding it.
+**Status:** accepted (CPU verification: docs/runs.md attempt 7; GPU benchmark pending)

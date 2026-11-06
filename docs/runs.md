@@ -13,6 +13,7 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 4 | 2026-11-06 | Kaggle T4 | run2 / 6f67820 | Completed, **worse than run 1** | Val acc 0.704, macro-F1 0.335; exclusion collapsed to "not excluded" |
 | 5 | 2026-11-05 | Laptop CPU | attention benchmark (fp32) / d7008ea | **Success** | Tiled = reference within ~1e-6; 4096× smaller score buffer; slower than fused SDPA |
 | 6 | 2026-11-06 | Kaggle T4 | run3 / 7080257 | Planned | — |
+| 7 | 2026-11-06 | Laptop CPU | Task 3 KV-cache verification / (this commit) | **Success** | Manual decoder = HF to 3e-5 (fp32); all 4 decoding paths token-identical |
 
 ---
 
@@ -105,3 +106,23 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 - **Hypotheses:** (a) run 3 vs run 1 isolates the prompt effect under fine-tuning; (b) at least one checkpoint has higher val macro-F1 than its loss-selected counterpart would have had (the per-checkpoint table will show whether loss and F1 disagree).
 - **Expected time:** about 22 min (as run 2) minus the oversampling overhead, plus 3 × ~36 s of checkpoint evaluation.
 - **Results:** (to be filled in)
+## Attempt 7: Task 3 KV-cache verification (laptop CPU, fp32)
+- **Run:** a scratch check script; `pytest tests/test_kv_cache.py` (14 passed + 1 real-model test with `RUN_MODEL_TESTS=1`); `python -m src.decoding.benchmark_kv --smoke --modes no_cache hf_cache manual_cache manual_no_cache` (Qwen2.5-0.5B, fp32).
+- **What was built:**
+  - `src/decoding/manual_decoder.py`: a hand-written Qwen2 forward pass that uses only the HF *weights*, with explicit RMSNorm, RoPE at absolute positions, grouped-query attention (2 KV heads → 14 query heads), and a preallocated `KVCache` with `write` / `advance` / `crop`. Attention goes through the Task 4 code (reference or tiled).
+  - `src/decoding/generate.py`: three explicit loops. `greedy_no_cache` re-runs the full sequence each step; `greedy_hf_cache` passes a `DynamicCache` with explicit `position_ids` and `attention_mask`; `greedy_manual` uses the hand-written decoder, cached or not.
+- **Correctness results:**
+  - Manual forward vs HF forward, 0.5B fp32: max abs logit difference **3.1e-5**. Cached incremental (prefill T−1, then 1 step) vs full: **3.0e-5**.
+  - Tiny random Qwen2 in fp64: manual = HF to 1e-9, both full and incremental (prefill 20 + 13 single steps), with reference and tiled attention.
+  - Greedy tokens are **identical across all paths** for input lengths {1, 7, 40} × output lengths {1, 5, 24} (tiny model), on the real 0.5B model (16 tokens), and in every smoke benchmark config. **No mismatches to investigate yet.** The GPU fp16 benchmark will be the real test, since reduction order differs between cached and uncached kernels there.
+- **CPU smoke timings (0.5B fp32, 1 repeat, indicative only):**
+
+| Input | Output | Mode | Prefill ms | Decode ms | Decode tok/s |
+|---|---|---|---|---|---|
+| 48 | 8 | no_cache | 294 | 2274 | 3.1 |
+| 48 | 8 | hf_cache | 317 | 510 | 13.7 |
+| 48 | 8 | manual_cache | 341 | 519 | 13.5 |
+| 48 | 8 | manual_no_cache | 336 | 2489 | 2.8 |
+
+- **Interpretation:** prefill costs about the same in every mode (it's the same computation). Decoding with a cache is about 4.5× faster at 48+8 tokens, and the gap grows with length because uncached steps reprocess the whole sequence. The manual decoder is about as fast as HF's cached path, so the hand-written loop adds no measurable overhead.
+- **Next:** the GPU benchmark (`CONFIG = 'benchmarks'` in the Kaggle notebook) on the fine-tuned 1.5B in fp16 with inputs {128, 512, 1024} × outputs {32, 128, 256}, 3 repeats.

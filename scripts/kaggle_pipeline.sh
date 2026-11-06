@@ -4,6 +4,7 @@
 set -euo pipefail
 
 CONFIG="$1"; shift
+if [ "$CONFIG" = "benchmarks" ]; then exec bash scripts/kaggle_benchmarks.sh "$@"; fi
 SMOKE_ONLY=0; SKIP_BASELINE=0
 for a in "$@"; do
   case "$a" in
