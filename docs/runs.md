@@ -12,7 +12,7 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 3 | 2026-11-05 | Kaggle T4 | run1 / 29b1596 | **Success** | Val acc 0.743, macro-F1 0.432 |
 | 4 | 2026-11-06 | Kaggle T4 | run2 / 6f67820 | Completed, **worse than run 1** | Val acc 0.704, macro-F1 0.335; exclusion collapsed to "not excluded" |
 | 5 | 2026-11-05 | Laptop CPU | attention benchmark (fp32) / d7008ea | **Success** | Tiled = reference within ~1e-6; 4096× smaller score buffer; slower than fused SDPA |
-| 6 | 2026-11-06 | Kaggle T4 | run3 / (this commit) | Planned | — |
+| 6 | 2026-11-06 | Kaggle T4 | run3 / 7080257 | Planned | — |
 
 ---
 

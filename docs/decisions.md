@@ -33,10 +33,10 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-05 | S1/S5 | Configs are now per run (`configs/run1.yaml`, `configs/run2.yaml`) with `run_name`; Kaggle steps moved to `scripts/kaggle_pipeline.sh`; notebook reduced to choosing `CONFIG` | A new experiment shouldn't need notebook edits | D-016 | 800548a |
 | 2026-11-05 | S1 | Added `docs/runs.md`: numbered log of every run attempt, including failures | User request | — | 800548a |
 | 2026-11-05 | S8 | Task 4: `src/attention/attention.py` (reference SDPA + tiled online-softmax), 52 correctness tests, `src/attention/benchmark.py` with `--smoke` | Task 4 requirements (E1–E3) | D-017 | d7008ea |
-| 2026-11-06 | S5 | Run 2 results recorded: worse than run 1 (macro-F1 0.335 vs 0.432); oversampling + loss-based selection picked an under-trained epoch-1 adapter | Run 2 analysis | D-018 | (this commit) |
-| 2026-11-06 | S5 | Checkpoint selection by **val macro-F1** from generation (`src/eval/select_checkpoint.py`, `select_by` in config, `save_total_limit` configurable); pipeline evaluates each epoch checkpoint; smoke stage now loads a raw checkpoint | Val loss disagrees with the reported metric | D-018 | (this commit) |
-| 2026-11-06 | S5 | `configs/run3.yaml`: prompt v2, no oversampling, F1-based selection | Remove run 2's confound; fix selection | D-018 | (this commit) |
-| 2026-11-06 | S6/S11 | `src/eval/compare.py`: markdown comparison table of metrics files | Report and run-log tables | — | (this commit) |
+| 2026-11-06 | S5 | Run 2 results recorded: worse than run 1 (macro-F1 0.335 vs 0.432); oversampling + loss-based selection picked an under-trained epoch-1 adapter | Run 2 analysis | D-018 | 7080257 |
+| 2026-11-06 | S5 | Checkpoint selection by **val macro-F1** from generation (`src/eval/select_checkpoint.py`, `select_by` in config, `save_total_limit` configurable); pipeline evaluates each epoch checkpoint; smoke stage now loads a raw checkpoint | Val loss disagrees with the reported metric | D-018 | 7080257 |
+| 2026-11-06 | S5 | `configs/run3.yaml`: prompt v2, no oversampling, F1-based selection | Remove run 2's confound; fix selection | D-018 | 7080257 |
+| 2026-11-06 | S6/S11 | `src/eval/compare.py`: markdown comparison table of metrics files | Report and run-log tables | — | 7080257 |
 
 ---
 
