@@ -17,7 +17,7 @@ def tiny():
     torch.manual_seed(0)
     cfg = Qwen2Config(vocab_size=97, hidden_size=64, intermediate_size=128, num_hidden_layers=3,
                       num_attention_heads=4, num_key_value_heads=2, max_position_embeddings=256,
-                      rope_parameters={"rope_type": "default", "rope_theta": 10000.0}, tie_word_embeddings=True)
+                      rope_parameters={"rope_type": "default", "rope_theta": 10000.0}, tie_word_embeddings=False)  # tied random models just copy the last token
     m = Qwen2ForCausalLM(cfg).to(torch.float64).eval()
     return m
 

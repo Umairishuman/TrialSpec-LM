@@ -14,6 +14,7 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 5 | 2026-11-05 | Laptop CPU | attention benchmark (fp32) / d7008ea | **Success** | Tiled = reference within ~1e-6; 4096× smaller score buffer; slower than fused SDPA |
 | 6 | 2026-11-06 | Kaggle T4 | run3 / 7080257 | Planned | — |
 | 7 | 2026-11-06 | Laptop CPU | Task 3 KV-cache verification / 0d8f427 | **Success** | Manual decoder = HF to 3e-5 (fp32); all 4 decoding paths token-identical |
+| 8 | 2026-11-06 | Laptop CPU | Task 5 speculative verification / (this commit) | **Success** (after 2 test-design fixes) | 1.5B/0.5B bf16: tokens identical to greedy, acceptance 50–58%, 0.7× speed on CPU |
 
 ---
 
@@ -126,3 +127,18 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 
 - **Interpretation:** prefill costs about the same in every mode (it's the same computation). Decoding with a cache is about 4.5× faster at 48+8 tokens, and the gap grows with length because uncached steps reprocess the whole sequence. The manual decoder is about as fast as HF's cached path, so the hand-written loop adds no measurable overhead.
 - **Next:** the GPU benchmark (`CONFIG = 'benchmarks'` in the Kaggle notebook) on the fine-tuned 1.5B in fp16 with inputs {128, 512, 1024} × outputs {32, 128, 256}, 3 repeats.
+## Attempt 8: Task 5 speculative decoding verification (laptop CPU)
+- **Run:** `pytest tests/test_speculative.py`; a scratch check with Qwen2.5-1.5B-Instruct (target) + 0.5B-Instruct (draft) in bf16, 40 tokens; `python -m src.decoding.benchmark_spec --smoke`.
+- **Problem 1 (test design):** `test_unrelated_draft_still_correct` failed, because a *random, unrelated* draft got 100% acceptance. **Why:** tiny random Qwen2 models with **tied** input/output embeddings put most of the logit mass on the input token, so every such model just repeats the last prompt token (`6, 6, 6, …`), and two random models always agree. The KV-cache equality tests had the same weakness. **Fix:** untied embeddings in both test files (outputs now vary, e.g. `1, 59, 22, 59, …`).
+- **Problem 2 (test design):** after untying, the "noisy draft" (target weights + 0.05 absolute noise, one layer fewer) got **0%** acceptance. **Why:** the weights are initialised with std ≈ 0.02, so 0.05 noise swamps them. **Fix:** noise = 20% of each tensor's std, same depth. Measured acceptance at k=4 over 5 prompts: 11–54%. Added `test_noisy_draft_partially_accepted`, which asserts 0 < acceptance < 1, so both the accept and reject paths are always exercised.
+- **Problem 3 (real finding, decoding settings):** in the smoke benchmark, HF assisted generation did **not** match our greedy output on the free-text prompt. **Why:** Qwen2.5's shipped `generation_config.json` sets `do_sample=True, temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.1`. Passing `do_sample=False` disables sampling, but **the repetition penalty stays active**, so `model.generate` was not pure greedy. **Impact:** `src/eval/predict.py` called `generate(do_sample=False)`, so **runs 1–3 val predictions used greedy + repetition_penalty 1.1**. Run-to-run comparisons stay valid (identical settings), but the logged decoding description was incomplete. **Fix:** an explicit `GenerationConfig` (`greedy_config`) with `repetition_penalty=1.0` by default and a `--repetition-penalty` flag to reproduce the old setting. All settings are now written to the metrics metadata (D-020). After the fix, HF assisted generation matches on both prompt sets.
+- **Problem 4 (benchmark design):** to force fixed-length free-text output, HF needs `min_new_tokens`, which *suppresses* EOS, while our loops just ignore it, so they would diverge exactly where the model wants to stop. **Fix:** both prompt sets are EOS-terminated in every mode (task ≤ 64 tokens, free ≤ 128).
+- **Real-model result (bf16 CPU, 40 tokens, prompt "what is chronic stable angina?"):**
+
+| Mode | Time | Tokens equal to greedy | Acceptance | Mean accepted/round | Target forwards |
+|---|---|---|---|---|---|
+| Target greedy (cached) | 7.4 s | — | — | — | 40 |
+| Speculative k=2 | 10.0 s | yes | 0.58 | 1.17 | 19 |
+| Speculative k=4 | 11.2 s | yes | 0.50 | 2.00 | 14 |
+
+- **Interpretation:** correct (identical tokens), and the target forward passes drop from 40 to 14–19. It's still slower on CPU: compute-bound CPU decoding makes a 0.5B draft step cost about 1/3 of a target step, so k draft steps plus the extra verification work outweigh the passes saved. On a GPU, single-token decoding is memory-bandwidth-bound, so verifying k+1 tokens costs about the same as one step; that's where a speedup is possible. To be measured in the Kaggle benchmark.

@@ -9,10 +9,13 @@ step() { echo; echo "##### $1 #####"; date -u +%H:%M:%S; }
 step "tests";                      python -m pytest -q tests
 step "smoke: attention";           python -m src.attention.benchmark --smoke
 step "smoke: kv cache";            python -m src.decoding.benchmark_kv --smoke
+step "smoke: speculative";         python -m src.decoding.benchmark_spec --smoke
 echo; echo "===== ALL BENCHMARK SMOKE TESTS PASSED ====="
 
 step "Task 4: attention fp16";     python -m src.attention.benchmark --dtype float16
 step "Task 4: attention fp32";     python -m src.attention.benchmark --dtype float32
 step "Task 3: KV cache (1.5B fine-tuned, fp16)"
 python -m src.decoding.benchmark_kv --adapter "$ADAPTER"
+step "Task 5: speculative decoding (target 1.5B fine-tuned, draft 0.5B base, fp16)"
+python -m src.decoding.benchmark_spec --adapter "$ADAPTER"
 echo; echo "===== BENCHMARKS FINISHED ====="
