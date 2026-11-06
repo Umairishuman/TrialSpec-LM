@@ -46,6 +46,7 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-06 | S5 | Run 3 results recorded: prompt v2 still collapses exclusion (macro-F1 0.379 < run 1's 0.432); F1 selection chose epoch 3 over the loss-optimal epoch 2. **Run 1 remains the best model** | Run 3 analysis | D-022 | 1144c1c |
 | 2026-11-06 | S5 | Pipeline: per-config `eval_repetition_penalty` (default 1.0), `run_baseline`, and `select_by` read from YAML; baseline filename includes the penalty; `final_eval` entry point reserved | Comparable ablation decoding; D-020 | D-022 | 1144c1c |
 | 2026-11-06 | S5 | `configs/run4.yaml`: prompt v1 + oversampling + F1 selection, eval at repetition_penalty 1.1 | Complete the 2×2 ablation | D-022 | 1144c1c |
+| 2026-11-06 | S7/S8/S9 | GPU benchmark results for Tasks 3–5 recorded (`results/{attention,kv_cache,speculative}/*cuda*.json`, run log attempt 9): KV cache 9.3× decode speed-up at 1024+256; 2/27 token mismatches diagnosed as exact fp16 logit ties; tiled attention exact but launch-bound; speculative decoding exact but 0.61–0.80× | Kaggle benchmark run | D-023 | (this commit) |
 
 ---
 
@@ -226,4 +227,11 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 **Interpretation:** the v2 definition of "not excluded" ("…or gives no sign of it") encodes the expert majority convention but erases the boundary with "not enough information", the other silent-note label. It improves zero-shot behaviour (accuracy 0.068 → 0.175) and slightly improves inclusion after fine-tuning (0.360 → 0.374), but hurts exclusion.
 **Decision:** prompt v1 remains the production prompt, and **run 1's adapter (`umairishuman/trialspec-qwen2.5-1.5b-lora`) is the current best model**. Prompt v2 is kept in the code as a documented negative result. Run 4 (v1 + oversampling + F1 selection) completes a 2×2 ablation. If run 4 beats run 1 on val macro-F1 it becomes the final model; otherwise run 1 does. The choice is made **only on validation**; the test split is used once afterwards.
 **Rejected for now:** a v3 prompt that rewrites the "not excluded" definition. It would mean tuning prompt wording on 8 validation patients (overfitting risk), and there's no time for another round of iteration before the deadline.
+**Status:** accepted
+## D-023: Interpretation of the GPU benchmarks; no further optimisation (2026-11-06)
+**Context:** the T4 benchmarks (run log attempt 9) show the cache and tiled-attention mechanisms working as intended. Speculative decoding is exact but slower.
+**Finding (shared root cause):** at batch size 1 the T4 is **kernel-launch-bound**, not compute- or bandwidth-bound. A cached 1.5B decode step takes about 37 ms, roughly 4× the weight-read time (3 GB / 320 GB/s ≈ 9 ms). This one effect explains (i) the Python tiled attention being 70–135× slower than fused SDPA (thousands of small kernels), and (ii) the speculative slowdown: the 24-layer draft costs about 0.86 of a 28-layer target step. Leviathan et al.'s speed-up formula with the measured acceptance predicts 0.77× at k=4, and we measured 0.74×.
+**Options considered:** (a) CUDA graphs / `torch.compile(mode="reduce-overhead")` for the decoders; (b) a smaller, shallower draft (would need training a new draft model); (c) report as is, with the quantitative explanation.
+**Decision:** (c). The rubric explicitly allows a slower speculative decoder when correctness and measurements are documented (grading rule iv). (a) and (b) carry real risk with 4 days left and are listed in the report as future work.
+**Mismatch policy (Task 3):** fp16 greedy mismatches are accepted only when the reference top-1/top-2 margin at the first differing step is ~0 (here exactly 0.000). Any mismatch with a clear margin would be treated as a bug.
 **Status:** accepted

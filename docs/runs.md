@@ -15,7 +15,7 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 6 | 2026-11-06 | Kaggle T4 | run3 / 1a1e11d | Completed, still below run 1 | Selected epoch 3: val macro-F1 0.379; exclusion still collapses |
 | 7 | 2026-11-06 | Laptop CPU | Task 3 KV-cache verification / 0d8f427 | **Success** | Manual decoder = HF to 3e-5 (fp32); all 4 decoding paths token-identical |
 | 8 | 2026-11-06 | Laptop CPU | Task 5 speculative verification / 3a2e7a6 | **Success** (after 2 test-design fixes) | 1.5B/0.5B bf16: tokens identical to greedy, acceptance 50–58%, 0.7× speed on CPU |
-| 9 | 2026-11-06 | Kaggle T4 | benchmarks (Tasks 3–5) / 78cdfab | Running | — |
+| 9 | 2026-11-06 | Kaggle T4 | benchmarks (Tasks 3–5) / 78cdfab | **Success** (2,983 s) | KV cache 9.3× decode speed-up; tiled attn correct but slow; speculative exact, 0.61–0.80× |
 | 10 | 2026-11-06 | Kaggle T4 | run4 / 1144c1c | Planned | — |
 
 ---
@@ -157,9 +157,59 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | Speculative k=4 | 11.2 s | yes | 0.50 | 2.00 | 14 |
 
 - **Interpretation:** correct (identical tokens), and the target forward passes drop from 40 to 14–19. It's still slower on CPU: compute-bound CPU decoding makes a 0.5B draft step cost about 1/3 of a target step, so k draft steps plus the extra verification work outweigh the passes saved. On a GPU, single-token decoding is memory-bandwidth-bound, so verifying k+1 tokens costs about the same as one step; that's where a speedup is possible. To be measured in the Kaggle benchmark.
-## Attempt 9: GPU benchmarks for Tasks 3–5 (running)
+## Attempt 9: GPU benchmarks for Tasks 3–5
 - **Run:** Kaggle notebook with `CONFIG = 'benchmarks'` → `scripts/kaggle_benchmarks.sh`, commit 78cdfab, adapter `umairishuman/trialspec-qwen2.5-1.5b-lora` (run 1). Order: tests → attention/KV/speculative smoke → attention fp16 + fp32 → KV cache (inputs {128, 512, 1024} × outputs {32, 128, 256}, 3 repeats) → speculative (k ∈ {2,4,6,8}, 8 task + 8 free-text prompts, 3 repeats).
-- **Results:** (to be filled in)
+- **Outcome:** completed in 2,983 s (about 50 min) on a Tesla T4, commit 78cdfab. All tests and the 3 benchmark smoke runs passed first. Files: `results/attention/benchmark_cuda_float{16,32}.json`, `results/kv_cache/benchmark_cuda_float16.json`, `results/speculative/benchmark_cuda_float16.json`. (The downloaded zip was named ``results-benchmark-v`.zip``: a backtick typed instead of "1". Harmless, but PowerShell needs `-LiteralPath` to open it.)
+
+### Task 4: attention (T4; error vs fp64 truth; 3 warm-up + 10 repeats, median)
+| B,H,Lq,Lk (D=128) | Causal | dtype | Ref ms | Tiled ms | SDPA ms | Max err (all 3) | Peak extra MiB ref / tiled / SDPA |
+|---|---|---|---|---|---|---|---|
+| 1,12,512,512 | yes | fp16 | 1.46 | 13.4 | 0.16 | 1.4e-3 | 36 / 3.8 / 1.5 |
+| 1,12,1024,1024 | yes | fp16 | 4.95 | 45.8 | 0.34 | 1.7e-3 | 144 / 5.3 / 3.0 |
+| 1,12,2048,2048 | yes | fp16 | 17.7 | 168 | 1.26 | 1.7e-3 | 576 / 8.3 / 6.0 |
+| 1,12,4096,4096 | no | fp16 | 55.2 | 1233 | 9.0 | 1.7e-4 | **2304** / 14.3 / 12.0 |
+| 1,12,4096,4096 | yes | fp16 | 67.9 | 652 | 5.06 | 1.6e-3 | **2304** / 14.3 / 12.0 |
+| 1,12,4096,4096 | yes | fp32 | 68.4 | 550 | 18.1 | 1.2e-6 | 2304 / 25.9 / 24.0 |
+| 8,12,1,2048 (decode) | yes | fp16 | 2.82 | 9.96 | 0.67 | 8.6e-5 | 97.5 / 3.3 / 0.0 |
+
+- **Numerics:** all three are equivalent. fp32 max error ≤ 1.7e-6; fp16 ≤ 1.7e-3, which is fp16 output rounding at |values| ~ 1 (fp16 spacing near 1 is 9.8e-4), the same for every implementation.
+- **Memory:** the reference materialises the B·H·L² score matrix (2.3 GB at L=4096). The tiled version's peak grows only linearly (output + one tile), matching fused SDPA (FlashAttention backend available on T4: `flash=True`).
+- **Speed:** on the GPU the tiled Python version is **10–22× slower than the reference and about 70–135× slower than SDPA**, far worse than on CPU (about 1×). Each tile issues several separate CUDA kernels (matmul, max, exp, sum, rescale) from a Python loop: (L/64)² tiles × about 8 launches, e.g. 4096 tiles at L=4096 → about 30k launches. Launch overhead (~5–10 µs each) and HBM round-trips for every intermediate dominate. A fused kernel does the same online softmax inside one kernel, keeps tiles in SRAM and uses tensor cores. Causal tile skipping halves the tiled time (1233 → 652 ms), as expected.
+
+### Task 3: KV cache (fine-tuned 1.5B merged, fp16, greedy, EOS ignored; 1 warm-up + 3 repeats)
+| Input | Output | no_cache tok/s | hf_cache tok/s | manual_cache tok/s | Speed-up (manual vs none) | Peak extra MiB none / manual | KV cache MiB | Tokens equal |
+|---|---|---|---|---|---|---|---|---|
+| 128 | 32 | 23.7 | 26.2 | 25.4 | 1.07× | 92 / 44 | 4.4 | ✔ ✔ |
+| 128 | 128 | 20.1 | 26.9 | 26.0 | 1.29× | 149 / 48 | 7.0 | ✔ / ✘ at step 76 |
+| 128 | 256 | 15.1 | 26.8 | 25.9 | 1.72× | 223 / 51 | 10.5 | ✔ / ✘ at step 76 |
+| 512 | 128 | 6.4 | 26.7 | 25.8 | 4.0× | 373 / 178 | 17.5 | ✔ ✔ |
+| 512 | 256 | 5.7 | 26.5 | 25.4 | 4.5× | 447 / 182 | 21.0 | ✔ ✔ |
+| 1024 | 128 | 3.0 | 26.4 | 25.5 | 8.5× | 671 / 350 | 31.5 | ✔ ✔ |
+| 1024 | 256 | 2.8 | 26.5 | 25.9 | **9.3×** | 745 / 353 | 35.0 | ✔ ✔ |
+
+- **Prefill** is the same in every mode (41 / 120 / 285 ms for 128 / 512 / 1024 tokens), since it's the same computation.
+- **Decode:** uncached steps cost O(current length) and grow during generation (1024+256: 314 ms → 396 ms per step). Cached steps are flat at about 37–39 ms regardless of length, so caching turns decoding from quadratic into linear. The manual decoder is within about 3–4% of HF's cached path (Python-level RMSNorm/RoPE).
+- **Memory:** the KV cache matches the formula 28,672 B/token: 1,280 tokens → 35.0 MiB. The uncached path has a *higher* peak (it recomputes activations for the whole sequence each step).
+- **Mismatches: 2 of 27 configs** (manual_cache, input 128, outputs 128 and 256; the same event). The first difference is at step 76. **Diagnosis:** the uncached reference's top-1 and top-2 logits at that step are **exactly equal in fp16** (margin 0.000); the cached path's logits differ in the last bits (different kernels and reduction order for a 1×L vs L×L attention), so the tie breaks the other way. After that the sequences diverge, as greedy decoding does. This is the numerical effect predicted in D-019, not a logic error: the same code is token-exact in fp32/fp64 (attempt 7, tests).
+
+### Task 5: speculative decoding (target = fine-tuned 1.5B, draft = base 0.5B, fp16, EOS-terminated; 8 val prompts per set; 1 warm-up + 3 repeats)
+| Set | k | Acceptance | Mean speed-up | tok/s (target greedy: task 24.2, free 25.6) | Tokens equal (8/8) |
+|---|---|---|---|---|---|
+| task (JSON, ~15–23 tokens) | 2 | 0.818 | 0.72× | 17.4 | ✔ |
+| task | 4 | 0.792 | 0.74× | 17.8 | ✔ |
+| task | 6 | 0.827 | **0.80×** | 19.3 | ✔ |
+| task | 8 | 0.723 | 0.75× | 18.1 | ✔ |
+| free (≤128 tokens) | 2 | 0.762 | 0.76× | 19.4 | ✔ |
+| free | 4 | 0.634 | 0.73× | 18.6 | ✔ |
+| free | 6 | 0.555 | 0.67× | 17.1 | ✔ |
+| free | 8 | 0.490 | 0.61× | 15.6 | ✔ |
+
+- **Correctness:** 64/64 speculative runs are token-identical to target greedy. HF `assistant_model=` greedy output is identical too (16/16).
+- **Acceptance** is high on the task prompts (0.72–0.83) even though the draft is *not* fine-tuned: the JSON scaffold (`{"evidence_ids": [`, `"label": "`) is easy to predict. Free text has lower acceptance, falling with k as expected.
+- **Why it's slower: launch-bound decoding.** A cached 1.5B step takes about 37 ms at batch 1 on the T4, which is too slow to be explained by memory bandwidth (3 GB of weights / 320 GB/s ≈ 9 ms). Most of the time is per-layer kernel-launch overhead, so cost scales with **layer count**, not parameter count. The 0.5B draft has 24 layers vs the target's 28, so a draft step costs about c ≈ 24/28 ≈ 0.86 of a target step, instead of the ~0.33 its parameter count suggests.
+- **Quantitative check:** the expected speed-up (Leviathan et al., 2023) is S = (1 − α^(k+1)) / ((1 − α)(k·c + 1)). With α = 0.79, k = 4, c = 0.86 this gives **0.77×**; measured: **0.74×**. With α = 0.83, k = 6 it predicts 0.73× vs 0.80× measured. So the slowdown is explained by the draft-to-target cost ratio, not by a bug. The same formula shows a speed-up needs c ≲ 0.3 at this acceptance rate.
+- **What would make it faster** (not done; out of scope): a shallower draft (few layers), CUDA graphs / `torch.compile` to remove launch overhead (which would bring c toward the parameter ratio), or a larger batch.
+- **Memory:** extra peak 116–155 MiB (task) and 60–96 MiB (free) on top of both models' weights (2.9 GB + 0.9 GB), mostly the two KV caches plus the k+1-token verification activations.
 
 ## Attempt 10 = Run 4: prompt v1 + oversampling + F1 selection (planned)
 - **Config:** `configs/run4.yaml`. Same as run 1 except: oversampling (target 60, max 4×, as in run 2); `select_by: val_macro_f1`; all checkpoints kept. `eval_repetition_penalty: 1.1`, so its val numbers are directly comparable with runs 1–3; zero-shot baseline skipped (it already exists for v1 at 1.1).
