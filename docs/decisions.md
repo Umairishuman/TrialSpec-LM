@@ -46,7 +46,7 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-06 | S5 | Run 3 results recorded: prompt v2 still collapses exclusion (macro-F1 0.379 < run 1's 0.432); F1 selection chose epoch 3 over the loss-optimal epoch 2. **Run 1 remains the best model** | Run 3 analysis | D-022 | 1144c1c |
 | 2026-11-06 | S5 | Pipeline: per-config `eval_repetition_penalty` (default 1.0), `run_baseline`, and `select_by` read from YAML; baseline filename includes the penalty; `final_eval` entry point reserved | Comparable ablation decoding; D-020 | D-022 | 1144c1c |
 | 2026-11-06 | S5 | `configs/run4.yaml`: prompt v1 + oversampling + F1 selection, eval at repetition_penalty 1.1 | Complete the 2×2 ablation | D-022 | 1144c1c |
-| 2026-11-06 | S7/S8/S9 | GPU benchmark results for Tasks 3–5 recorded (`results/{attention,kv_cache,speculative}/*cuda*.json`, run log attempt 9): KV cache 9.3× decode speed-up at 1024+256; 2/27 token mismatches diagnosed as exact fp16 logit ties; tiled attention exact but launch-bound; speculative decoding exact but 0.61–0.80× | Kaggle benchmark run | D-023 | (this commit) |
+| 2026-11-06 | S7/S8/S9 | GPU benchmark results for Tasks 3–5 recorded (`results/{attention,kv_cache,speculative}/*cuda*.json`, run log attempt 9): KV cache 9.3× decode speed-up at 1024+256; 2/27 token mismatches diagnosed as exact fp16 logit ties; tiled attention exact but launch-bound; speculative decoding exact but 0.61–0.80× | Kaggle benchmark run | D-023 | a82c600 |
 
 ---
 
