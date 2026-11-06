@@ -1,0 +1,47 @@
+{
+  "run": "run3-v2prompt-f1select",
+  "criterion": "max val macro-F1 (tie: accuracy, then earlier step)",
+  "selected": {
+    "checkpoint": "checkpoint-114",
+    "step": 114,
+    "metrics_file": "results/finetuned/run3-v2prompt-f1select_checkpoint-114_val.metrics.json",
+    "macro_f1": 0.37870652720396963,
+    "accuracy": 0.7281553398058253,
+    "inclusion_macro_f1": 0.37361827560795874,
+    "exclusion_macro_f1": 0.2520833333333333,
+    "evidence_micro_f1": 0.5559845559845561
+  },
+  "candidates": [
+    {
+      "checkpoint": "checkpoint-114",
+      "step": 114,
+      "metrics_file": "results/finetuned/run3-v2prompt-f1select_checkpoint-114_val.metrics.json",
+      "macro_f1": 0.37870652720396963,
+      "accuracy": 0.7281553398058253,
+      "inclusion_macro_f1": 0.37361827560795874,
+      "exclusion_macro_f1": 0.2520833333333333,
+      "evidence_micro_f1": 0.5559845559845561
+    },
+    {
+      "checkpoint": "checkpoint-38",
+      "step": 38,
+      "metrics_file": "results/finetuned/run3-v2prompt-f1select_checkpoint-38_val.metrics.json",
+      "macro_f1": 0.342351567530456,
+      "accuracy": 0.7087378640776699,
+      "inclusion_macro_f1": 0.35196965989723517,
+      "exclusion_macro_f1": 0.2095435684647303,
+      "evidence_micro_f1": 0.3842592592592593
+    },
+    {
+      "checkpoint": "checkpoint-76",
+      "step": 76,
+      "metrics_file": "results/finetuned/run3-v2prompt-f1select_checkpoint-76_val.metrics.json",
+      "macro_f1": 0.35092892354303146,
+      "accuracy": 0.7184466019417476,
+      "inclusion_macro_f1": 0.3673992673992674,
+      "exclusion_macro_f1": 0.2095435684647303,
+      "evidence_micro_f1": 0.5702127659574469
+    }
+  ],
+  "git_commit": "1a1e11dc2cd803b2ca5cb5cb1bdfe061a2e3a08c"
+}

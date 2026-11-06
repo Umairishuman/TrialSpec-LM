@@ -12,9 +12,11 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 3 | 2026-11-05 | Kaggle T4 | run1 / 29b1596 | **Success** | Val acc 0.743, macro-F1 0.432 |
 | 4 | 2026-11-06 | Kaggle T4 | run2 / 6f67820 | Completed, **worse than run 1** | Val acc 0.704, macro-F1 0.335; exclusion collapsed to "not excluded" |
 | 5 | 2026-11-05 | Laptop CPU | attention benchmark (fp32) / d7008ea | **Success** | Tiled = reference within ~1e-6; 4096× smaller score buffer; slower than fused SDPA |
-| 6 | 2026-11-06 | Kaggle T4 | run3 / 7080257 | Planned | — |
+| 6 | 2026-11-06 | Kaggle T4 | run3 / 1a1e11d | Completed, still below run 1 | Selected epoch 3: val macro-F1 0.379; exclusion still collapses |
 | 7 | 2026-11-06 | Laptop CPU | Task 3 KV-cache verification / 0d8f427 | **Success** | Manual decoder = HF to 3e-5 (fp32); all 4 decoding paths token-identical |
 | 8 | 2026-11-06 | Laptop CPU | Task 5 speculative verification / 3a2e7a6 | **Success** (after 2 test-design fixes) | 1.5B/0.5B bf16: tokens identical to greedy, acceptance 50–58%, 0.7× speed on CPU |
+| 9 | 2026-11-06 | Kaggle T4 | benchmarks (Tasks 3–5) / 78cdfab | Running | — |
+| 10 | 2026-11-06 | Kaggle T4 | run4 / (this commit) | Planned | — |
 
 ---
 
@@ -106,7 +108,20 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 - **Test-set discipline:** selection uses val only. The test split is still untouched.
 - **Hypotheses:** (a) run 3 vs run 1 isolates the prompt effect under fine-tuning; (b) at least one checkpoint has higher val macro-F1 than its loss-selected counterpart would have had (the per-checkpoint table will show whether loss and F1 disagree).
 - **Expected time:** about 22 min (as run 2) minus the oversampling overhead, plus 3 × ~36 s of checkpoint evaluation.
-- **Results:** (to be filled in)
+- **Results** (Kaggle T4, commit 1a1e11d, so evaluated with Qwen's implicit repetition_penalty 1.1 like runs 1–2, see D-020; training 907 s):
+
+| Checkpoint | Val loss | Acc | Macro-F1 | Incl. mF1 | Excl. mF1 | Evid. micro-F1 |
+|---|---|---|---|---|---|---|
+| epoch 1 (step 38) | 0.1338 | 0.709 | 0.342 | 0.352 | 0.210 | 0.384 |
+| epoch 2 (step 76), **lowest loss** | **0.1149** | 0.718 | 0.351 | 0.367 | 0.210 | **0.570** |
+| epoch 3 (step 114), **selected (best F1)** | 0.1175 | **0.728** | **0.379** | **0.374** | **0.252** | 0.556 |
+| *run 1 (prompt v1), for reference* | 0.1146 | 0.743 | 0.432 | 0.360 | 0.401 | 0.554 |
+
+- **Hypothesis (b) confirmed:** loss and F1 disagree. The loss-optimal checkpoint (epoch 2) has lower macro-F1 than epoch 3, so F1-based selection changed the choice. This directly supports the run 2 diagnosis.
+- **Hypothesis (a), the prompt effect, answered negatively:** with prompt v2 and no oversampling, exclusion **still collapses**. 137 of 140 exclusion criteria are predicted "not excluded" (all 26 gold "not enough information" and 10 of 11 "not applicable" included). Inclusion is slightly *better* than run 1 (0.374 vs 0.360; "included" F1 0.78).
+- **Why (most likely):** the v2 definition of *not excluded*, "the patient does not have the excluding condition (the note contradicts it **or gives no sign of it**)", tells the model to default to "not excluded" whenever the note is silent. That absorbs the "not enough information" cases, which are exactly the silent-note cases. The definition matches the expert majority convention (D-016) but erases the boundary with "not enough information". Run 1's names-only prompt left that boundary to be learned from data, and the model did learn it partly (NEI F1 0.29).
+- **Conclusion:** **run 1 remains the best model on validation** (macro-F1 0.432). The prompt-definition idea helped zero-shot (0.068 → 0.175 accuracy) but hurts fine-tuning for exclusion criteria. This goes in the report as a documented negative result.
+- **Artifacts:** `results/finetuned/run3-v2prompt-f1select_*` (all 3 checkpoints + selection), `results/training/run3-v2prompt-f1select_training_meta.json`, adapter `huggingface.co/umairishuman/trialspec-qwen2.5-1.5b-lora-run3` (epoch 3).
 ## Attempt 7: Task 3 KV-cache verification (laptop CPU, fp32)
 - **Run:** a scratch check script; `pytest tests/test_kv_cache.py` (14 passed + 1 real-model test with `RUN_MODEL_TESTS=1`); `python -m src.decoding.benchmark_kv --smoke --modes no_cache hf_cache manual_cache manual_no_cache` (Qwen2.5-0.5B, fp32).
 - **What was built:**
@@ -142,3 +157,13 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | Speculative k=4 | 11.2 s | yes | 0.50 | 2.00 | 14 |
 
 - **Interpretation:** correct (identical tokens), and the target forward passes drop from 40 to 14–19. It's still slower on CPU: compute-bound CPU decoding makes a 0.5B draft step cost about 1/3 of a target step, so k draft steps plus the extra verification work outweigh the passes saved. On a GPU, single-token decoding is memory-bandwidth-bound, so verifying k+1 tokens costs about the same as one step; that's where a speedup is possible. To be measured in the Kaggle benchmark.
+## Attempt 9: GPU benchmarks for Tasks 3–5 (running)
+- **Run:** Kaggle notebook with `CONFIG = 'benchmarks'` → `scripts/kaggle_benchmarks.sh`, commit 78cdfab, adapter `umairishuman/trialspec-qwen2.5-1.5b-lora` (run 1). Order: tests → attention/KV/speculative smoke → attention fp16 + fp32 → KV cache (inputs {128, 512, 1024} × outputs {32, 128, 256}, 3 repeats) → speculative (k ∈ {2,4,6,8}, 8 task + 8 free-text prompts, 3 repeats).
+- **Results:** (to be filled in)
+
+## Attempt 10 = Run 4: prompt v1 + oversampling + F1 selection (planned)
+- **Config:** `configs/run4.yaml`. Same as run 1 except: oversampling (target 60, max 4×, as in run 2); `select_by: val_macro_f1`; all checkpoints kept. `eval_repetition_penalty: 1.1`, so its val numbers are directly comparable with runs 1–3; zero-shot baseline skipped (it already exists for v1 at 1.1).
+- **Why:** completes a 2×2 ablation, with prompt {v1, v2} × oversampling {off, on} = run 1, run 4, run 3, run 2. Run 2 was the only oversampling run, and it was loss-selected with prompt v2, so oversampling has not been fairly tested yet.
+- **Hypothesis:** with the v1 prompt (which keeps the exclusion NEI boundary) and F1 selection, oversampling raises rare-class recall and macro-F1 above run 1's 0.432. If it doesn't, oversampling is rejected for this data.
+- **Caveat:** run 1 was selected by loss, runs 3–4 by F1. Run 1's checkpoints weren't kept, so this can't be equalised without retraining. It will be stated in the report.
+- **Results:** (to be filled in)

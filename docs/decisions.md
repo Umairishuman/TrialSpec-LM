@@ -43,6 +43,9 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-06 | S7/S9 | Tiny test models now use untied embeddings; noisy draft calibrated (20% of each tensor's std) + partial-acceptance test | Tied random models just copy the last token, making equality tests near-trivial | D-021 | 3a2e7a6 |
 | 2026-11-06 | S4/S6 | **Explicit decoding config** (`greedy_config`): `repetition_penalty=1.0` by default, `--repetition-penalty` flag, full settings in metrics metadata. Runs 1–3 used Qwen's implicit 1.1 | Qwen2.5 `generation_config.json` adds `repetition_penalty=1.1` to every `generate()` call | D-020 | 3a2e7a6 |
 | 2026-11-06 | S9 | Task 5: `src/decoding/speculative.py` (greedy speculative decoding, explicit cache rollback), 40 tests, `src/decoding/benchmark_spec.py` (task + free-text prompt sets, k ∈ {2,4,6,8}, HF assisted reference); added to `kaggle_benchmarks.sh` | Task 5 requirements (F1–F3) | D-021 | 3a2e7a6 |
+| 2026-11-06 | S5 | Run 3 results recorded: prompt v2 still collapses exclusion (macro-F1 0.379 < run 1's 0.432); F1 selection chose epoch 3 over the loss-optimal epoch 2. **Run 1 remains the best model** | Run 3 analysis | D-022 | (this commit) |
+| 2026-11-06 | S5 | Pipeline: per-config `eval_repetition_penalty` (default 1.0), `run_baseline`, and `select_by` read from YAML; baseline filename includes the penalty; `final_eval` entry point reserved | Comparable ablation decoding; D-020 | D-022 | (this commit) |
+| 2026-11-06 | S5 | `configs/run4.yaml`: prompt v1 + oversampling + F1 selection, eval at repetition_penalty 1.1 | Complete the 2×2 ablation | D-022 | (this commit) |
 
 ---
 
@@ -218,3 +221,9 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 **Test-design lesson:** tied-embedding random models copy the input token, so draft and target agree trivially. Tests now use untied embeddings and assert partial acceptance.
 **Expected performance:** a speedup is not guaranteed. On CPU (compute-bound) it measured 0.7× despite 50–58% acceptance. On GPU, decoding is memory-bound, so k+1-token verification costs about the same as a 1-token step; the benchmark measures k ∈ {2,4,6,8}, latency, tokens/s, acceptance and peak memory.
 **Status:** accepted (GPU benchmark pending)
+## D-022: Prompt v2 rejected for fine-tuning; run 1 stays the best model; 2×2 ablation (2026-11-06)
+**Evidence (val, all at repetition_penalty 1.1):** run 1 (v1, no oversampling) macro-F1 **0.432**; run 2 (v2, oversampling, loss-selected) 0.335; run 3 (v2, no oversampling, F1-selected) 0.379. Exclusion macro-F1: 0.401 / 0.210 / 0.252. In run 3, 137 of 140 exclusion criteria were predicted "not excluded" at the selected checkpoint.
+**Interpretation:** the v2 definition of "not excluded" ("…or gives no sign of it") encodes the expert majority convention but erases the boundary with "not enough information", the other silent-note label. It improves zero-shot behaviour (accuracy 0.068 → 0.175) and slightly improves inclusion after fine-tuning (0.360 → 0.374), but hurts exclusion.
+**Decision:** prompt v1 remains the production prompt, and **run 1's adapter (`umairishuman/trialspec-qwen2.5-1.5b-lora`) is the current best model**. Prompt v2 is kept in the code as a documented negative result. Run 4 (v1 + oversampling + F1 selection) completes a 2×2 ablation. If run 4 beats run 1 on val macro-F1 it becomes the final model; otherwise run 1 does. The choice is made **only on validation**; the test split is used once afterwards.
+**Rejected for now:** a v3 prompt that rewrites the "not excluded" definition. It would mean tuning prompt wording on 8 validation patients (overfitting risk), and there's no time for another round of iteration before the deadline.
+**Status:** accepted
