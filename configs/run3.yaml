@@ -1,0 +1,31 @@
+# Run 3: prompt v2, NO oversampling, checkpoint chosen by validation macro-F1 instead of validation loss.
+# Isolates the prompt change (vs run 1) and fixes run 2's selection problem (docs/runs.md attempt 4).
+run_name: run3-v2prompt-f1select
+model_id: Qwen/Qwen2.5-1.5B-Instruct
+prompt_version: v2
+max_len: 1024
+seed: 42
+select_by: val_macro_f1  # every epoch checkpoint is evaluated on val by generation; best macro-F1 is kept
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+train:
+  epochs: 3
+  lr: 2.0e-4
+  per_device_batch_size: 4
+  grad_accum: 4
+  warmup_ratio: 0.05
+  weight_decay: 0.0
+  lr_scheduler: cosine
+  gradient_checkpointing: true
+  fp16: true
+  logging_steps: 5
+  oversample: null
+  save_total_limit: null # keep all 3 epoch checkpoints for selection
+
+wandb_project: trialspec-lm
+hub_repo: umairishuman/trialspec-qwen2.5-1.5b-lora-run3

@@ -92,7 +92,7 @@ def main():
         lr_scheduler_type=tc["lr_scheduler"],
         fp16=on_gpu and tc["fp16"],
         load_best_model_at_end=True, metric_for_best_model="eval_loss", greater_is_better=False,
-        save_total_limit=2, seed=cfg["seed"], report_to=report_to,
+        save_total_limit=tc.get("save_total_limit", 2), seed=cfg["seed"], report_to=report_to,
         run_name=("smoke-" if args.smoke else "") + cfg["run_name"],
         remove_unused_columns=False, dataloader_num_workers=0,
         **(smoke_steps if args.smoke else full_steps),
@@ -129,6 +129,8 @@ def main():
         if on_gpu:
             print(f"peak GPU memory: {torch.cuda.max_memory_allocated() / 2**30:.2f} GiB")
         print("SMOKE TEST PASSED")
+    elif cfg.get("select_by"):
+        print(f"skipping push: checkpoint is chosen afterwards by {cfg['select_by']} (src/eval/select_checkpoint.py)")
     elif not args.no_push and cfg.get("hub_repo") and os.environ.get("HF_TOKEN"):
         from huggingface_hub import HfApi
         api = HfApi()

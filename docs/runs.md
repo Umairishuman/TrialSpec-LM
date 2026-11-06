@@ -10,8 +10,9 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 1 | 2026-11-05 | Kaggle (no accelerator) | run1 / 316e638 | Failed in 2 min | No GPU: CPU-only torch |
 | 2 | 2026-11-05 | Kaggle T4 | run1 / 965d874 | Failed in 1.5 min | torchao 0.10 vs peft 0.21 |
 | 3 | 2026-11-05 | Kaggle T4 | run1 / 29b1596 | **Success** | Val acc 0.743, macro-F1 0.432 |
-| 4 | 2026-11-05 | Kaggle T4 | run2 / 800548a | Running | — |
+| 4 | 2026-11-06 | Kaggle T4 | run2 / 6f67820 | Completed, **worse than run 1** | Val acc 0.704, macro-F1 0.335; exclusion collapsed to "not excluded" |
 | 5 | 2026-11-05 | Laptop CPU | attention benchmark (fp32) / d7008ea | **Success** | Tiled = reference within ~1e-6; 4096× smaller score buffer; slower than fused SDPA |
+| 6 | 2026-11-06 | Kaggle T4 | run3 / (this commit) | Planned | — |
 
 ---
 
@@ -60,7 +61,25 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 - **Also re-run:** the zero-shot baseline with prompt v2, so the before/after comparison uses identical prompts.
 - **Hypotheses:** (a) v2 raises zero-shot accuracy well above 0.068; (b) oversampling raises fine-tuned macro-F1 without a large accuracy drop.
 - **Caveat:** two changes at once, so the fine-tuned difference can't be attributed to just one of them. The zero-shot v1 vs v2 comparison isolates the prompt effect. If time allows, run 3 = v2 without oversampling.
-- **Results:** (to be filled in)
+- **Results** (Kaggle T4, commit 6f67820, whole notebook 1,307 s: training 1,021 s, the rest model download, smoke tests and about 64 s of val predictions; the earlier "~30 min" was only an estimate):
+
+| Model | Prompt | Acc | Macro-F1 | Incl. mF1 | Excl. mF1 | Evid. micro-F1 | Evid. macro-F1 | Parse OK |
+|---|---|---|---|---|---|---|---|---|
+| zero-shot | v1 | 0.068 | 0.054 | 0.064 | 0.074 | 0.000 | 0.563 | 100% |
+| zero-shot | v2 | 0.175 | 0.070 | 0.111 | 0.097 | 0.000 | 0.563 | 100% |
+| run 1 LoRA | v1 | **0.743** | **0.432** | **0.360** | **0.401** | **0.554** | **0.745** | 100% |
+| run 2 LoRA | v2 + oversample | 0.704 | 0.335 | 0.343 | 0.210 | 0.477 | 0.693 | 100% |
+
+- **Training:** val loss 0.1222 (epoch 1, **selected**) → 0.1313 → 0.1368. Run 1 was 0.1315 → 0.1146 → 0.1201.
+- **Hypothesis (a), the prompt helps zero-shot: partly confirmed.** Accuracy 0.068 → 0.175, and inclusion "not enough information" F1 0.22 → 0.44. But the zero-shot model *still never cites evidence* (all 206 predictions empty) and now over-predicts "not enough information" (72 of 101 "not excluded" cases).
+- **Hypothesis (b), oversampling improves macro-F1: rejected.** Macro-F1 fell 0.432 → 0.335. The exclusion confusion matrix shows **every one of the 140 exclusion criteria predicted "not excluded"**. Rare inclusion classes still get F1 = 0.
+- **Why it happened** (diagnosis):
+  1. **Checkpoint selection by val loss picked epoch 1.** With duplicated rare examples, val loss rises from epoch 2 on (memorising the copies). `load_best_model_at_end` therefore restored the epoch-1 adapter, taken while the learning rate was still high and the model still answered with the majority label.
+  2. **Val loss is a poor proxy for the metric we report.** Most target tokens are the fixed JSON wrapper and the evidence list; the label itself is only 2–5 tokens. A lower loss doesn't mean a better macro-F1.
+  3. **Confound:** prompt and oversampling changed together, so run 2 can't say which one hurt.
+- **No user mistake.** The notebook ran every stage correctly; the problem is in the experiment design.
+- **Response:** run 3 (attempt 6). Prompt v2 *without* oversampling, so the prompt effect is isolated against run 1, and the checkpoint is selected by **val macro-F1** from generated predictions at every epoch (D-018).
+- **Artifacts:** `results/baseline/Qwen2.5-1.5B-Instruct_prompt-v2_val.*`, `results/finetuned/run2-v2prompt-oversample_val.*`, `results/training/run2-v2prompt-oversample_training_meta.json`, adapter `huggingface.co/umairishuman/trialspec-qwen2.5-1.5b-lora-run2`.
 
 ## Attempt 5: Task 4 attention benchmark (laptop CPU, fp32)
 - **Run:** `python -m src.attention.benchmark --dtype float32` (blocks 64×64; 3 warm-up + 10 timed repeats; median ± std). Correctness first: `pytest tests/test_attention.py` gives **52 passed**. Tiled matches the reference to 1e-10 in fp64 across 6 shapes × causal/non-causal × 3 block sizes (16×16, 64×32, 7×13), including Lq=1 decode against a cache and chunked prefill (Lq < Lk). fp16 max error is under 2e-3, and logits around 1e4 stay finite.
@@ -78,3 +97,11 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 - **Interpretation:** all three implementations are numerically equivalent at fp32 precision. Tiling cuts the score buffer from O(Lq·Lk) to O(bq·bk), so it is 4096× smaller at L=4096. The Python tiled version is **slower** without causal masking, because of a Python loop with one small matmul per tile (kernel launches and allocations each time). With causal masking it skips fully masked tiles (about half the work) and roughly ties the reference. Fused SDPA is 2–4× faster than both: it runs in a single kernel, keeps tiles in on-chip memory and uses optimised GEMMs. This is the expected result for an educational implementation (assignment Task 4).
 - **Noise:** some runs have large std (e.g. tiled at L=2048 non-causal: ±574 ms) from laptop CPU frequency scaling and background load. The **GPU benchmark on Kaggle** (fp16, synchronised timing, CUDA peak memory) is still to run; it will be the reported one.
 - **Results file:** `results/attention/benchmark_cpu_float32.json`.
+
+## Attempt 6 = Run 3: prompt v2, no oversampling, checkpoint chosen by val macro-F1 (planned)
+- **Config:** `configs/run3.yaml`. Identical to run 1 except: **prompt v2** (label definitions); `save_total_limit: null` so all 3 epoch checkpoints are kept; `select_by: val_macro_f1`.
+- **New pipeline steps:** the smoke stage now also loads a *raw training checkpoint* as an adapter (`checkpoint-10`), so checkpoint loading is tested before the long run. After training, every `checkpoint-*` is evaluated on val by greedy generation. `src/eval/select_checkpoint.py` then picks the highest val macro-F1 (ties: accuracy, then earlier step), copies it to `outputs/run3-v2prompt-f1select/selected/`, writes `results/finetuned/run3-v2prompt-f1select_selection.json` and pushes only that adapter to `huggingface.co/umairishuman/trialspec-qwen2.5-1.5b-lora-run3`. Unit-tested in `tests/test_select_checkpoint.py`.
+- **Test-set discipline:** selection uses val only. The test split is still untouched.
+- **Hypotheses:** (a) run 3 vs run 1 isolates the prompt effect under fine-tuning; (b) at least one checkpoint has higher val macro-F1 than its loss-selected counterpart would have had (the per-checkpoint table will show whether loss and F1 disagree).
+- **Expected time:** about 22 min (as run 2) minus the oversampling overhead, plus 3 × ~36 s of checkpoint evaluation.
+- **Results:** (to be filled in)

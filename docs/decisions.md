@@ -33,6 +33,10 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-05 | S1/S5 | Configs are now per run (`configs/run1.yaml`, `configs/run2.yaml`) with `run_name`; Kaggle steps moved to `scripts/kaggle_pipeline.sh`; notebook reduced to choosing `CONFIG` | A new experiment shouldn't need notebook edits | D-016 | 800548a |
 | 2026-11-05 | S1 | Added `docs/runs.md`: numbered log of every run attempt, including failures | User request | — | 800548a |
 | 2026-11-05 | S8 | Task 4: `src/attention/attention.py` (reference SDPA + tiled online-softmax), 52 correctness tests, `src/attention/benchmark.py` with `--smoke` | Task 4 requirements (E1–E3) | D-017 | d7008ea |
+| 2026-11-06 | S5 | Run 2 results recorded: worse than run 1 (macro-F1 0.335 vs 0.432); oversampling + loss-based selection picked an under-trained epoch-1 adapter | Run 2 analysis | D-018 | (this commit) |
+| 2026-11-06 | S5 | Checkpoint selection by **val macro-F1** from generation (`src/eval/select_checkpoint.py`, `select_by` in config, `save_total_limit` configurable); pipeline evaluates each epoch checkpoint; smoke stage now loads a raw checkpoint | Val loss disagrees with the reported metric | D-018 | (this commit) |
+| 2026-11-06 | S5 | `configs/run3.yaml`: prompt v2, no oversampling, F1-based selection | Remove run 2's confound; fix selection | D-018 | (this commit) |
+| 2026-11-06 | S6/S11 | `src/eval/compare.py`: markdown comparison table of metrics files | Report and run-log tables | — | (this commit) |
 
 ---
 
@@ -173,3 +177,12 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 - **Ground truth:** benchmark errors are computed against an fp64 reference, so reference, tiled and SDPA are compared against the same truth.
 **Options rejected:** writing a Triton/CUDA kernel (not required by the assignment; not portable to CPU and P100); measuring only against SDPA (SDPA's own fp16 error would be hidden).
 **Status:** accepted
+
+## D-018: Select checkpoints by validation macro-F1, not validation loss (2026-11-06)
+**Context:** Run 2 (prompt v2 + oversampling) scored below run 1 on every metric (val macro-F1 0.335 vs 0.432). Its exclusion predictions collapsed to "not excluded" for all 140 cases. `load_best_model_at_end` with `metric_for_best_model=eval_loss` picked epoch 1, because val loss rose afterwards (0.122 → 0.131 → 0.137) as the duplicated rare examples were memorised.
+**Analysis:** loss is averaged over all answer tokens. In `{"evidence_ids": [...], "label": "..."}` the label is only 2–5 of 12–38 tokens, so loss mostly measures the JSON wrapper and the evidence IDs. Loss and the reported metric (macro-F1 over labels) can disagree, as they did in run 2.
+**Options considered:** (a) keep loss-based selection: reproduces run 2's failure; (b) a Trainer callback that generates on val each epoch: complex, and holds a second copy of state in GPU memory during training; (c) keep every epoch checkpoint and evaluate each *after* training with the same `predict.py` used for reporting, then choose the best val macro-F1; (d) a loss restricted to label tokens: still a proxy.
+**Decision:** (c). Selection rule: maximum val macro-F1; ties go to higher accuracy, then the earlier step. Implemented in `src/eval/select_checkpoint.py` (unit-tested), turned on with `select_by: val_macro_f1`. All checkpoints' val metrics are kept, so the loss-vs-F1 disagreement can be shown in the report. The test split is never used.
+**Run 3 design:** prompt v2 *without* oversampling, removing run 2's confound so run 3 vs run 1 isolates the prompt. Oversampling stays off for now; if run 3 still shows rare-class collapse, a later run can re-test oversampling with F1 selection.
+**Consequences:** 3 × ~36 s extra evaluation per run, and about 3 × 150 MB of checkpoints on Kaggle disk (fine).
+**Status:** accepted (results in docs/runs.md, attempt 6)
