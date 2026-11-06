@@ -38,8 +38,8 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-06 | S5 | `configs/run3.yaml`: prompt v2, no oversampling, F1-based selection | Remove run 2's confound; fix selection | D-018 | 7080257 |
 | 2026-11-06 | S6/S11 | `src/eval/compare.py`: markdown comparison table of metrics files | Report and run-log tables | — | 7080257 |
 | 2026-11-06 | S5 | Fixed `results/smoke` committed as a file (copy into a missing folder); ignore `results-*.zip` | Noticed in `git status` | — | fea194a |
-| 2026-11-06 | S7 | Task 3: hand-written Qwen2 decoder with explicit `KVCache` (`src/decoding/manual_decoder.py`), three explicit greedy loops (`src/decoding/generate.py`), 15 tests (tiny random Qwen2 in fp64 + gated real-model test), benchmark with mismatch diagnosis (`src/decoding/benchmark_kv.py`) | Task 3 requirements (D1–D3) | D-019 | (this commit) |
-| 2026-11-06 | S7/S8 | `scripts/kaggle_benchmarks.sh` (smoke first, then attention fp16/fp32 and KV benchmarks); notebook runs it with `CONFIG = 'benchmarks'` | GPU numbers for Tasks 3–5 in one Kaggle run | D-019 | (this commit) |
+| 2026-11-06 | S7 | Task 3: hand-written Qwen2 decoder with explicit `KVCache` (`src/decoding/manual_decoder.py`), three explicit greedy loops (`src/decoding/generate.py`), 15 tests (tiny random Qwen2 in fp64 + gated real-model test), benchmark with mismatch diagnosis (`src/decoding/benchmark_kv.py`) | Task 3 requirements (D1–D3) | D-019 | 0d8f427 |
+| 2026-11-06 | S7/S8 | `scripts/kaggle_benchmarks.sh` (smoke first, then attention fp16/fp32 and KV benchmarks); notebook runs it with `CONFIG = 'benchmarks'` | GPU numbers for Tasks 3–5 in one Kaggle run | D-019 | 0d8f427 |
 
 ---
 
