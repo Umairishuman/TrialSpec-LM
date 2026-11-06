@@ -43,9 +43,9 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-06 | S7/S9 | Tiny test models now use untied embeddings; noisy draft calibrated (20% of each tensor's std) + partial-acceptance test | Tied random models just copy the last token, making equality tests near-trivial | D-021 | 3a2e7a6 |
 | 2026-11-06 | S4/S6 | **Explicit decoding config** (`greedy_config`): `repetition_penalty=1.0` by default, `--repetition-penalty` flag, full settings in metrics metadata. Runs 1–3 used Qwen's implicit 1.1 | Qwen2.5 `generation_config.json` adds `repetition_penalty=1.1` to every `generate()` call | D-020 | 3a2e7a6 |
 | 2026-11-06 | S9 | Task 5: `src/decoding/speculative.py` (greedy speculative decoding, explicit cache rollback), 40 tests, `src/decoding/benchmark_spec.py` (task + free-text prompt sets, k ∈ {2,4,6,8}, HF assisted reference); added to `kaggle_benchmarks.sh` | Task 5 requirements (F1–F3) | D-021 | 3a2e7a6 |
-| 2026-11-06 | S5 | Run 3 results recorded: prompt v2 still collapses exclusion (macro-F1 0.379 < run 1's 0.432); F1 selection chose epoch 3 over the loss-optimal epoch 2. **Run 1 remains the best model** | Run 3 analysis | D-022 | (this commit) |
-| 2026-11-06 | S5 | Pipeline: per-config `eval_repetition_penalty` (default 1.0), `run_baseline`, and `select_by` read from YAML; baseline filename includes the penalty; `final_eval` entry point reserved | Comparable ablation decoding; D-020 | D-022 | (this commit) |
-| 2026-11-06 | S5 | `configs/run4.yaml`: prompt v1 + oversampling + F1 selection, eval at repetition_penalty 1.1 | Complete the 2×2 ablation | D-022 | (this commit) |
+| 2026-11-06 | S5 | Run 3 results recorded: prompt v2 still collapses exclusion (macro-F1 0.379 < run 1's 0.432); F1 selection chose epoch 3 over the loss-optimal epoch 2. **Run 1 remains the best model** | Run 3 analysis | D-022 | 1144c1c |
+| 2026-11-06 | S5 | Pipeline: per-config `eval_repetition_penalty` (default 1.0), `run_baseline`, and `select_by` read from YAML; baseline filename includes the penalty; `final_eval` entry point reserved | Comparable ablation decoding; D-020 | D-022 | 1144c1c |
+| 2026-11-06 | S5 | `configs/run4.yaml`: prompt v1 + oversampling + F1 selection, eval at repetition_penalty 1.1 | Complete the 2×2 ablation | D-022 | 1144c1c |
 
 ---
 
