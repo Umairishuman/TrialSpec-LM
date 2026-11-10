@@ -53,6 +53,7 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-10 | S6 | `compare.row` shows N/A for a missing inclusion/exclusion block | New orchestrator test found a crash: the 4-example smoke sample contains no exclusion criteria | D-024 | dc1dfb5 |
 | 2026-11-10 | S5/S11 | `src/train/export_wandb.py`: pulls every non-smoke W&B run's history to `results/training/wandb_export/*.csv` (+ `runs.json` with run URLs and configs) and draws `training_curves.png` (train/val loss, LR, grad norm). Runs 1–3 exported; run 4 to be added when it finishes | Report needs training curves (B3, H1); user provided W&B access | D-025 | 520691a |
 | 2026-11-10 | S5 | `kaggle_pipeline.sh`: `cfg` helper uses `${2:-}` instead of `$2` | Run 4 launch failed after ~1 min: `$2: unbound variable` under `set -u` (runs.md attempt 10) | D-022 | b8a687a |
+| 2026-11-10 | S10 | App hosting: run locally on the laptop (CPU, bf16, target 1.5B + draft 0.5B); optional HF Space only as a public backup. Reverses the 2026-11-05 "HF Space" plan | Measured: laptop ran both models in bf16 (runs.md attempt 8, 5.4 tok/s); free Space has 2 shared vCPUs | D-026 | — |
 
 ---
 
@@ -265,4 +266,11 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 **Decision:** (b), `python -m src.train.export_wandb`. Smoke runs (group `smoke`) are skipped. The API key is read from `WANDB_API_KEY` in the environment only, never written to code or files. `runs.json` stores run IDs, URLs and configs; Trainer already masks the hub token as `<HUB_TOKEN>` (checked).
 **Why:** reproducible and raw data committed, so the figures can be redrawn without W&B access. The first export (runs 1–3) visibly confirms D-018: run 2's val loss is lowest at epoch 1 and rises afterwards, while runs 1 and 3 bottom out at epoch 2.
 **Consequences/risks:** W&B run names differ from config run names for run 1 (`qwen2.5-1.5b-lora`); a name map gives the figure labels. Runs 1 and 3 have identical LR schedules, so their lines overlap in the LR panel.
+**Status:** accepted
+## D-026: Task 6 app runs locally on the laptop; HF Space is only a backup (2026-11-10)
+**Context:** the 2026-11-05 changelog planned a free HF Space for the app because the laptop "can't fit 1.5B + 0.5B". That conclusion came from the failed fp32 *training* run (runs.md attempt 0: weights + gradients + optimizer state + activations). Inference needs only weights.
+**Evidence:** laptop = Intel i5-1145G7 (4 cores / 8 threads), 15.7 GB RAM. Runs.md attempt 8 already ran target 1.5B + draft 0.5B together in bf16 on this laptop: target greedy 40 tokens in 7.4 s (about 5.4 tok/s), speculative output identical. A free CPU Space has 2 shared vCPUs (estimated 2–3× slower), sleeps when idle and re-downloads models on wake-up, and depends on the network during the demo.
+**Options considered:** (a) free HF Space as the main host; (b) laptop with the target only, speculative disabled; (c) laptop with target + draft in bf16, all three decoding modes live.
+**Decision:** (c). Launched with one command (`python -m src.app`, Gradio on `http://localhost:7860`). The same code can be pushed to a Space afterwards as a public backup link, not as the demo host.
+**Consequences/risks:** about 5–8 s per criterion on CPU (estimate: ~350-token prompt + ~20 output tokens), so the app processes criteria sequentially with a progress bar and limits input length. Models must be downloaded before the demo (offline-safe afterwards). Supersedes the 2026-11-05 hosting note (changelog row "Planned app hosting changed from laptop to free HF Space").
 **Status:** accepted
