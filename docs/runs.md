@@ -19,6 +19,13 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 10 | 2026-11-10 | Kaggle T4 | run4 / 14eb0b5 | Failed in 1 min | `kaggle_pipeline.sh: line 19: $2: unbound variable` |
 | 11 | 2026-11-10 | Kaggle T4 | run4 / 326900a | **Success**, best val so far | Selected epoch 3 (ckpt-138): val acc 0.743, macro-F1 0.604 (rp 1.1); gain mostly from "excluded" (n=2) and exclusion NEI |
 | 12 | 2026-11-10 | Kaggle T4 | final_eval / e13346a | **Success**, test locked | Selected run4 (val mF1 0.604); **test acc 0.738, macro-F1 0.660**, evidence micro-F1 0.544 (zero-shot: 0.136 / 0.131 / 0.000) |
+| 13 | 2026-11-10 | Laptop CPU | app `--smoke` (tiny models) / uncommitted | Failed after splitting | `UnicodeEncodeError: 'charmap' codec` printing random model output |
+| 14 | 2026-11-10 | Laptop CPU | app `--smoke` + `pytest` / uncommitted | **Success** (8.6 s; 41/41 tests after 1 fix) | Retry → fallback path exercised; all 4 decoding modes token-identical |
+| 15 | 2026-11-10 | Laptop CPU | app real-model check (scratch script) | Failed at import | `ModuleNotFoundError: No module named 'src'` (script outside repo) |
+| 16 | 2026-11-10 | Laptop CPU | app real-model check, run 1 adapter, bf16, offline | Correct but **too slow** | ~15 s/criterion (prefill ≈ 15 s); uncached benchmark 382 s for 16 tokens; all modes token-identical |
+| 17 | 2026-11-10 | Laptop CPU | bf16 vs fp32 prefill/decode timing (scratch) | **Success** | fp32 prefill 5.4 s vs bf16 12.6 s (284 tokens); decode 2.2 vs 3.0 tok/s → app switched to fp32 (D-031) |
+| 18 | 2026-11-10 | Laptop CPU | app real-model check, **run 4**, fp32, offline | **Success** | ~10.8 s/criterion after the first (25.8 s warm-up); uncached benchmark 47.6 s for 8 tokens; 4/6 labels match experts; all modes token-identical |
+| 19 | 2026-11-10 | Laptop CPU | `python -m src.app` (real server, run 4, fp32, offline) driven through the Gradio API | **Success** | Starts in ~23 s; validation errors shown; unseen 4-criterion note screened in 46.7 s; live benchmark 4/4 modes identical |
 
 ---
 
@@ -289,3 +296,97 @@ Test per-class F1 for run4 (support): included 0.863 (27), not included 0.429 (7
 - **Error analysis:** test has 54 wrong labels out of 206 (26.2%). By category: missed_information 28, unsupported_evidence 30 (correct label), spurious_nei 16, applicability 6, polarity_flip 4, hallucinated IDs 0, parse failures 0. 12 cases are printed per split in `error_analysis_{val,test}.md`. The "why it went wrong" text is still to be written by hand (report task).
 - **Main weakness:** exclusion "not enough information". The model mostly answers "not excluded" when the note is silent (recall 0.107 on test), which is the D-016 tension between expert convention and the no-evidence rule. The app flags these decisions as "no supporting evidence cited".
 - **Before/after (B4, same 206 test examples, identical decoding):** accuracy 0.136 → 0.738, macro-F1 0.131 → 0.660, evidence micro-F1 0.000 → 0.544.
+
+## Attempt 13: app smoke test, first try (failed)
+- **Run:** `python -m src.app --smoke` on the laptop (tiny random 2-layer Qwen2 target + 1-layer draft with the real Qwen tokenizer; one free-text note with 3 criteria at the time).
+- **What happened:** validation, sentence splitting and generation for all 3 criteria worked. The script then crashed while printing the results: `UnicodeEncodeError: 'charmap' codec can't encode characters in position 55-56`.
+- **Why:** random models emit arbitrary Unicode tokens, and the Windows console uses cp1252. The same crash could hit the real app if a model ever printed an unusual character to the console.
+- **Fix:** `src/app/__main__.py` reconfigures stdout/stderr with `errors="replace"` at start-up. The smoke input was also reduced to the planned 1 note with 2 criteria.
+- **Observed before the crash:** the free-text splitter correctly kept "500 mg b.i.d. and…" and "Dr. Smith…" inside their sentences (4 sentences, IDs 0–3).
+
+## Attempt 14: app smoke test and unit tests (success)
+- **Smoke run:** `python -m src.app --smoke` passed in 8.6 s.
+  - The empty note and empty criteria were both rejected with friendly messages.
+  - Both criteria went through the full malformed-output path: the 8-token answer was cut off → retry with 12 tokens → still unparseable → constrained label scoring (fallback). Labels "included" and "not excluded" were flagged 🔁, and the outcome was "Needs review" because fallback rows count as unresolved (D-029).
+  - Markdown and HTML reports were written. The benchmark ran all 4 modes (uncached, HF DynamicCache, hand-written cache, speculative k=2), all token-identical in fp32.
+  - The Gradio UI was built with 5 examples.
+- **Unit tests:** `pytest tests/test_app.py`: 40/41 on the first run. The failure was real: the Markdown report escaped `_` inside the decoding JSON (`repetition\_penalty`), which makes the provenance hard to read. Fix: render JSON as code spans. 41/41 after the fix. Full suite: 173 passed, 1 skipped (gated real-model test).
+- **Prefetch:** `python -m src.app --prefetch` downloaded the run 1–4 adapters (17–35 s each); the base and draft models were already cached.
+
+## Attempt 15: real-model app check, first try (failed)
+- **Run:** a scratch script (outside the repo) that loads the real backend and screens one val example headless.
+- **What happened:** `ModuleNotFoundError: No module named 'src'`, at once.
+- **Why:** Python puts the *script's* directory on `sys.path`, not the working directory. **Fix:** relaunched with `PYTHONPATH=<repo root>`. No code change.
+
+## Attempt 16: real-model app check on the laptop (CPU, bf16, offline)
+- **Run:** same script, `HF_HUB_OFFLINE=1` (proves the demo can start without a network). Model: base 1.5B + **run 1** adapter (the final selection did not exist yet when it started) + 0.5B draft, bf16 on the i5-1145G7. Example: the first val example (6 criteria). Then a benchmark of all 4 modes on criterion I1, 16 new tokens, k=4, warm-up on.
+- **Hypothesis:** about 5–8 s per criterion (D-026); uncached decoding much slower than the cached modes; speculative exact but not faster on CPU (attempt 8).
+- **Outcome:** functionally correct. It started fully offline; target + adapter loaded and merged in 19.1 s, draft in 2.7 s, process RSS 4.44 GiB. All 6 criteria parsed on the first attempt (no retry/fallback), reports were written, and all 4 benchmark modes were token-identical. **But it was about 2× slower than planned:**
+
+| Criterion | Prompt tokens | Model label | Expert label | Evidence | Time |
+|---|---|---|---|---|---|
+| I1 | 284 | not enough information | not included | [0] | 15.0 s |
+| I2 | 287 | not enough information | included | [0] | 15.1 s |
+| I3 | 299 | not enough information | not applicable | [] | 15.4 s |
+| E1 | 294 | not excluded | not excluded | [] | 14.7 s |
+| E2 | 294 | not enough information | not enough information | [0–5] | 18.2 s |
+| E3 | 283 | not excluded | not enough information | [] | 14.2 s |
+
+Outcome card: **Needs review** (unresolved I1, I2, I3, E2; no inclusion criterion met; E1 and E3 flagged "no supporting sentence"). 2/6 labels agree with the experts on this example. This is run 1's adapter on one val pair, so it says nothing about overall accuracy; the app now uses run 4 (D-030).
+
+Benchmark, criterion I1 (284-token prompt, 16 new tokens, EOS-terminated, warm-up, 1 repeat, bf16):
+
+| Mode | Prefill | Decode | Total | Decode tok/s | Speed-up vs uncached | Target forwards | Acceptance | KV cache | Same tokens |
+|---|---|---|---|---|---|---|---|---|---|
+| Uncached reference | 15.3 s | 367.2 s | 382.4 s | 0.04 | 1.0× | 16 | — | — | ✔ |
+| KV cache (HF DynamicCache) | 14.2 s | 3.5 s | 17.7 s | 4.25 | 21.6× | 16 | — | 8.2 MiB | ✔ |
+| KV cache (hand-written) | 15.0 s | 3.7 s | 18.8 s | 4.03 | 20.4× | 16 | — | 8.2 MiB | ✔ |
+| Speculative (k=4) | 19.6 s | 3.8 s | 23.5 s | 3.91 | 16.3× | 5 | 0.81 | 11.7 MiB | ✔ |
+
+- **Problem:** prefill dominates. About 14–15 s for ~290 tokens (≈ 20 tok/s), while cached decoding runs at a reasonable ~4 tok/s. Uncached decoding repeats that prefill at every step, so 16 tokens took 6.4 minutes, which is far too slow for a live demo.
+- **Suspected cause:** the i5-1145G7 (Tiger Lake) has no native bf16 matrix instructions (no AVX512-BF16/AMX), so large bf16 matmuls (prefill) run through a slow conversion path. Small decode steps are memory-bound, so they are hurt less. The 7.4 s in attempt 8 had a short prompt, which hid this. **Next:** measure fp32 vs bf16 prefill on the same prompt (attempt 17).
+- **Positive findings:** 284-token prompts, 1/3 of the training maximum. Speculative decoding needed only 5 target forwards for 16 tokens (acceptance 0.81) and was exact, but slower overall: the 0.5B draft's own prefill adds 4–5 s.
+## Attempt 17: bf16 vs fp32 speed on the laptop CPU
+- **Run:** scratch script: base Qwen2.5-1.5B-Instruct (no adapter), 284 random token IDs (the length of the app prompts), `greedy_hf_cache` for 16 tokens; warm-up, then the best of 2 runs, for fp32 and bf16. 4 threads, offline.
+- **Results:** fp32 prefill **5.44 s**, decode 2.19 tok/s; bf16 prefill **12.59 s**, decode 2.99 tok/s.
+- **Interpretation:** bf16 prefill is 2.3× slower because this CPU has no native bf16 matmul. Decode is memory-bound, so bf16 is a little faster there. Per criterion, fp32 wins (~13 s vs ~18 s), and the uncached benchmark (one prefill per token) gains the full 2.3×. Decode tok/s here is lower than in attempt 16 (4.0–4.2): laptop clock speed varies with temperature, so CPU timings carry ±30% noise. **Decision:** D-031, app dtype → fp32.
+
+## Attempt 18: real-model app check with the final model in fp32
+- **Run:** the attempt 16 script, now picking **run 4** automatically from `results/final/selection.json`, fp32, offline; benchmark at 8 new tokens.
+- **Hypothesis:** ~10–15 s per criterion; uncached benchmark ≈ 8 × 5 s ≈ 45 s; RAM ≈ 8–9 GiB.
+- **Outcome:** success, offline. Target + run 4 adapter loaded in 18.7 s, draft in 8.8 s. Reported RSS 1.83 GiB: on Windows, memory-mapped safetensors weights are not fully counted in RSS, so this understates real use (fp32 weights ≈ 8.2 GB by size); D-031's estimate stands.
+
+| Criterion | Model label (run 4) | Expert label | Evidence | Time |
+|---|---|---|---|---|
+| I1 | not enough information | not included | [0] | 25.8 s (first call: warm-up) |
+| I2 | included | included ✓ | [0] | 12.8 s |
+| I3 | not enough information | not applicable | [0, 4, 5] | 9.6 s |
+| E1 | not excluded | not excluded ✓ | [0] | 9.5 s |
+| E2 | not enough information | not enough information ✓ | [0–5] | 13.4 s |
+| E3 | not excluded | not enough information | [6] | 8.6 s |
+
+Total 79.6 s (bf16 run 1 in attempt 16: 92.7 s); **mean 10.8 s per criterion after the first.** Outcome card: Needs review (unresolved I1, I3, E2). 4/6 labels agree with the experts (run 1: 2/6 on the same pair). This is a single val pair, not an accuracy estimate.
+
+Benchmark, criterion I1, 8 new tokens, fp32:
+
+| Mode | Prefill | Decode | Total | Decode tok/s | Speed-up vs uncached | Target forwards | Acceptance | KV cache | Same tokens |
+|---|---|---|---|---|---|---|---|---|---|
+| Uncached reference | 5.8 s | 41.8 s | 47.6 s | 0.17 | 1.0× | 8 | — | — | ✔ |
+| KV cache (HF DynamicCache) | 5.1 s | 1.6 s | 6.7 s | 4.41 | 7.1× | 8 | — | 16.0 MiB | ✔ |
+| KV cache (hand-written) | 7.8 s | 2.8 s | 10.6 s | 2.47 | 4.5× | 8 | — | 16.0 MiB | ✔ |
+| Speculative (k=4) | 11.9 s | 2.2 s | 14.0 s | 3.20 | 3.4× | 3 | 0.63 | 22.8 MiB | ✔ |
+
+- **Hypotheses:** ~10–15 s per criterion ✔; uncached ≈ 45 s ✔ (47.6 s).
+- **Interpretation:** fp32 prefill is ~5–6 s, as in attempt 17. Uncached decode costs one full re-run of the prompt per token (~5.2 s each), so the KV cache is the difference between ~5 s and ~0.2–0.4 s per token. The hand-written decoder's slower prefill (7.8 s vs 5.1 s) comes from Python-level RMSNorm/RoPE and our reference attention instead of fused SDPA on CPU; single runs on a laptop vary by ±30% (attempt 17). Speculative decoding is exact, needs 3 instead of 8 target passes, but pays the draft's prefill (≈ +6 s), so it is slower end to end, as on the T4 (D-023).
+
+## Attempt 19: the real app server, end to end through its own API
+- **Run:** `HF_HUB_OFFLINE=1 python -m src.app` (the documented one-line start), then the UI's own event handlers called through `gradio_client` against `http://127.0.0.1:7860`. The page config contains the disclaimer.
+- **Start-up:** target + run 4 adapter 14.1 s, draft 8.5 s; serving after ~23 s, fully offline.
+- **Input validation (G1/G4):** an empty note and empty criteria returned both friendly messages; a 10,000-character note returned "The note is too long (10,000 characters; the limit is 6,000)…". No model call was made in either case.
+- **Unseen note (G2):** a free-text note written for this test (not from the dataset; 4 sentences) with 2 inclusion + 2 exclusion criteria. Screened in 46.7 s (5.8 / 7.3 / 9.2 / 8.9 s per criterion). The table shows label, highlighted evidence sentence and explanation for each criterion; Markdown and HTML reports were offered for download.
+  - I1 "Type 2 diabetes mellitus" → included, cites [0] ✔
+  - I2 "HbA1c between 7% and 10%" → not enough information, cites [1] ("HbA1c last month was 8.1%") ✘: the value is inside the range, so a clinician would say "included". This is a genuine model error (numeric range reasoning) and a useful example for the report and demo; the rule turns it into **Needs review** with 🟠 missing information, not a wrong final verdict.
+  - E1 "Myocardial infarction within the past 6 months" → not excluded, cites [2] (MI in 2021) ✔
+  - E2 "Pregnancy" → not excluded, cites [3] ("She is not pregnant") ✔
+- **Live benchmark (G3):** custom prompt "Name one symptom of diabetes." (35 tokens), 4 new tokens, k=2, all 4 modes, 24 s for the whole request: uncached 4.43 s, HF cache 1.89 s (2.34×), hand-written cache 1.94 s (2.29×), speculative 3.33 s (1.33×; acceptance 0.50, 3 target passes). Tokens identical in every mode; KV cache 2.1 MiB (target) / 3.1 MiB (target + draft).
+- **Note:** the `gradio_client` test script first crashed printing 🟠 to the cp1252 console (the same issue as attempt 13, in the test script, not the app); re-run with `PYTHONIOENCODING=utf-8`.

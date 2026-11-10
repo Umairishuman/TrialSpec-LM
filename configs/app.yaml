@@ -1,0 +1,42 @@
+# Task 6 browser app (docs/decisions.md D-026, D-028, D-029).
+# Start:  python -m src.app            -> http://localhost:7860
+# Before the demo (downloads everything once, then works offline):  python -m src.app --prefetch
+model_id: Qwen/Qwen2.5-1.5B-Instruct
+# Default model: run 1's adapter with prompt v1 (best model before the final evaluation, D-022).
+adapter: umairishuman/trialspec-qwen2.5-1.5b-lora
+prompt_version: v1
+# When results/final/selection.json exists (written by the final evaluation, D-024), its selected adapter
+# replaces the two lines above; the prompt version is looked up in final_eval_config. Set false to pin.
+use_final_selection: true
+final_selection: results/final/selection.json
+final_eval_config: configs/final_eval.yaml
+
+draft_model: Qwen/Qwen2.5-0.5B-Instruct   # speculative decoding in the benchmark tab (same tokenizer, D-008)
+preload_draft: true
+device: auto            # auto = cuda if available (fp16), otherwise cpu with `dtype`
+dtype: float32          # CPU dtype. Not bf16: this CPU has no native bf16 matmul; fp32 prefill is 2.3x faster (D-031)
+threads: null           # torch CPU threads; null = torch default
+
+decoding:
+  max_new_tokens: 64          # same budget as the evaluation (configs/final_eval.yaml)
+  retry_max_new_tokens: 128   # one retry when the answer was cut off before the JSON closed
+  repetition_penalty: 1.0     # pure greedy (D-020)
+
+limits:
+  max_note_chars: 6000
+  max_sentences: 60
+  max_criteria: 20
+  max_criterion_chars: 600
+  max_prompt_tokens: 1024     # training max_len (D-008)
+  warn_prompt_tokens: 640     # longest training prompt is 597 tokens
+
+benchmark:
+  default_max_new_tokens: 8   # uncached decoding costs ~one prefill (~5 s on CPU) per token (D-031)
+  max_new_tokens_limit: 64
+  default_k: 4
+
+examples: data/app_examples.json
+report_dir: outputs/app_reports
+server:
+  host: 127.0.0.1
+  port: 7860
