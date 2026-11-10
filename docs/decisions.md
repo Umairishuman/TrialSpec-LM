@@ -54,6 +54,8 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-10 | S5/S11 | `src/train/export_wandb.py`: pulls every non-smoke W&B run's history to `results/training/wandb_export/*.csv` (+ `runs.json` with run URLs and configs) and draws `training_curves.png` (train/val loss, LR, grad norm). Runs 1–3 exported; run 4 to be added when it finishes | Report needs training curves (B3, H1); user provided W&B access | D-025 | 520691a |
 | 2026-11-10 | S5 | `kaggle_pipeline.sh`: `cfg` helper uses `${2:-}` instead of `$2` | Run 4 launch failed after ~1 min: `$2: unbound variable` under `set -u` (runs.md attempt 10) | D-022 | b8a687a |
 | 2026-11-10 | S10 | App hosting: run locally on the laptop (CPU, bf16, target 1.5B + draft 0.5B); optional HF Space only as a public backup. Reverses the 2026-11-05 "HF Space" plan | Measured: laptop ran both models in bf16 (runs.md attempt 8, 5.4 tok/s); free Space has 2 shared vCPUs | D-026 | e8197a1 |
+| 2026-11-10 | S5 | **Run 4 results recorded** (runs.md attempt 11): val macro-F1 0.604 vs run 1's 0.432 at rp 1.1; run 4 files copied from `results-v4.zip` into `results/` | Run 4 finished | D-027 | (to be filled) |
+| 2026-11-10 | S5/S11 | W&B export re-run: run 4 history added, `training_curves.png` redrawn with 4 runs | D-025 said to add run 4 when it finished | D-025, D-027 | (to be filled) |
 
 ---
 
@@ -273,4 +275,14 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 **Options considered:** (a) free HF Space as the main host; (b) laptop with the target only, speculative disabled; (c) laptop with target + draft in bf16, all three decoding modes live.
 **Decision:** (c). Launched with one command (`python -m src.app`, Gradio on `http://localhost:7860`). The same code can be pushed to a Space afterwards as a public backup link, not as the demo host.
 **Consequences/risks:** about 5–8 s per criterion on CPU (estimate: ~350-token prompt + ~20 output tokens), so the app processes criteria sequentially with a progress bar and limits input length. Models must be downloaded before the demo (offline-safe afterwards). Supersedes the 2026-11-05 hosting note (changelog row "Planned app hosting changed from laptop to free HF Space").
+**Status:** accepted
+## D-027: Run 4 results: oversampling works with prompt v1; macro-F1 gain is partly a 2-example effect (2026-11-10)
+**Context:** run 4 (prompt v1 + oversampling to 60/group, max 4×, F1-based checkpoint selection) completes the 2×2 ablation planned in D-022 (runs.md attempt 11).
+**Evidence (val, n=206, repetition_penalty 1.1, comparable with runs 1–3):** selected epoch 3: accuracy 0.743 (= run 1), macro-F1 **0.604** (run 1: 0.432), inclusion 0.368 (0.360), exclusion **0.676** (0.401), evidence micro-F1 0.520 (0.554). Per class: exclusion "excluded" F1 0 → 1.0 (**support 2**), exclusion "not enough information" 0.294 → 0.410 (support 26); the other classes moved by ≤ 0.03. Ablation (val macro-F1): v1 0.432 · v1+oversample 0.604 · v2 0.379 · v2+oversample 0.335.
+**Interpretation:**
+1. Oversampling helps only when the prompt keeps the "not excluded" vs "not enough information" boundary (v1). With v2 the exclusion collapse dominates (D-022).
+2. The size of the macro-F1 gain is fragile. The "excluded" class has 2 val examples, so getting both right adds about 0.12 to an 8-class macro average. The robust part of the gain is exclusion NEI recall, so the report must show per-class F1 with supports next to the macro-F1, and must not present 0.604 as a 40% improvement without that caveat.
+3. Val loss is again lowest at epoch 1 (0.121) and highest at the selected epoch 3 (0.135). This is a second independent confirmation of D-018: loss-based selection would have picked a worse model (macro-F1 0.589).
+**Decision:** no new model choice is made here. Under D-022's rule run 4 would replace run 1, but the binding choice is the pure-greedy val re-scoring in the final evaluation (D-024, runs.md attempt 12), which is already running. The app (Task 6) takes its adapter from config, so whichever model `results/final/selection.json` names can be used without code changes.
+**Consequences/risks:** with 8 val patients and supports of 1–3 for four classes, rankings between runs are noisy. This is stated as a limitation, and is not fixed by more tuning on val (overfitting risk; no time).
 **Status:** accepted

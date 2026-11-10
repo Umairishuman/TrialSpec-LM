@@ -17,8 +17,8 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 8 | 2026-11-06 | Laptop CPU | Task 5 speculative verification / 3a2e7a6 | **Success** (after 2 test-design fixes) | 1.5B/0.5B bf16: tokens identical to greedy, acceptance 50–58%, 0.7× speed on CPU |
 | 9 | 2026-11-06 | Kaggle T4 | benchmarks (Tasks 3–5) / 78cdfab | **Success** (2,983 s) | KV cache 9.3× decode speed-up; tiled attn correct but slow; speculative exact, 0.61–0.80× |
 | 10 | 2026-11-10 | Kaggle T4 | run4 / 14eb0b5 | Failed in 1 min | `kaggle_pipeline.sh: line 19: $2: unbound variable` |
-| 11 | 2026-11-10 | Kaggle T4 | run4 / 326900a | Running (re-launched) | — |
-| 12 | 2026-11-10 | Kaggle T4 | final_eval / (to be filled) | Planned (after run 4) | — |
+| 11 | 2026-11-10 | Kaggle T4 | run4 / 326900a | **Success**, best val so far | Selected epoch 3 (ckpt-138): val acc 0.743, macro-F1 0.604 (rp 1.1); gain mostly from "excluded" (n=2) and exclusion NEI |
+| 12 | 2026-11-10 | Kaggle T4 | final_eval / (to be filled) | Running | — |
 
 ---
 
@@ -225,9 +225,36 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 - **Why:** completes a 2×2 ablation, with prompt {v1, v2} × oversampling {off, on} = run 1, run 4, run 3, run 2. Run 2 was the only oversampling run, and it was loss-selected with prompt v2, so oversampling has not been fairly tested yet.
 - **Hypothesis:** with the v1 prompt (which keeps the exclusion NEI boundary) and F1 selection, oversampling raises rare-class recall and macro-F1 above run 1's 0.432. If it doesn't, oversampling is rejected for this data.
 - **Caveat:** run 1 was selected by loss, runs 3–4 by F1. Run 1's checkpoints weren't kept, so this can't be equalised without retraining. It will be stated in the report.
-- **Results:** (to be filled in)
+- **Outcome:** completed on a Tesla T4, commit 326900a (fp16 AMP). Results downloaded as `results-v4.zip`; the new files were copied to `results/finetuned/run4-*`, `results/smoke/run4-*` and `results/training/run4-*_training_meta.json`. The other files in the zip are older copies of what the repo already had (Kaggle clones the repo), so they were not copied. The selected adapter (checkpoint-138) is on `huggingface.co/umairishuman/trialspec-qwen2.5-1.5b-lora-run4` (Hub commit "checkpoint-138 selected by val macro-F1 (326900a3)"). `training_meta.json` lists `best_checkpoint = checkpoint-46`: that is the Trainer's own loss-based choice, not the one used.
+- **Results (val, n=206, greedy + repetition_penalty 1.1, same as runs 1–3):**
 
-## Attempt 12: final evaluation, val selection + test once (planned)
+| Checkpoint | Val loss | Acc | Macro-F1 | Incl. mF1 | Excl. mF1 | Evid. micro-F1 | Evid. macro-F1 | Parse OK |
+|---|---|---|---|---|---|---|---|---|
+| epoch 1 (step 46), lowest loss | **0.1211** | 0.733 | 0.589 | 0.344 | 0.598 | 0.500 | — | 100% |
+| epoch 2 (step 92) | 0.1309 | 0.728 | 0.542 | 0.354 | 0.597 | **0.537** | — | 100% |
+| epoch 3 (step 138), **selected (best F1)** | 0.1355 | **0.743** | **0.604** | **0.368** | **0.676** | 0.520 | 0.717 | 100% |
+| *run 1 (v1, no oversampling), for reference* | 0.1146 | 0.743 | 0.432 | 0.360 | 0.401 | 0.554 | 0.745 | 100% |
+
+Per-class F1 (support), run 4 epoch 3 vs run 1:
+
+| Class | Support | Run 1 | Run 4 |
+|---|---|---|---|
+| incl. included | 35 | 0.742 | 0.750 |
+| incl. not included | 3 | 0.000 | 0.000 |
+| incl. not enough information | 27 | 0.697 | 0.721 |
+| incl. not applicable | 1 | 0.000 | 0.000 |
+| excl. excluded | **2** | 0.000 | **1.000** |
+| excl. not excluded | 101 | 0.867 | 0.860 |
+| excl. not enough information | 26 | 0.294 | **0.410** |
+| excl. not applicable | 11 | 0.444 | 0.435 |
+
+- **Hypothesis confirmed, with a caveat.** With prompt v1 and F1 selection, oversampling raises val macro-F1 from 0.432 to 0.604, and exclusion macro-F1 from 0.401 to 0.676. Most of the jump, though, is the class "excluded" going from F1 0 to 1.0 **on 2 validation examples**. In a macro average over 8 classes that one class alone adds about 0.12. The more robust gain is exclusion "not enough information" (n=26: 0.294 → 0.410). Accuracy is unchanged (0.743), and evidence micro-F1 drops slightly (0.554 → 0.520: recall up, precision down).
+- **Loss vs F1 again:** val loss is lowest at epoch 1 and rises to epoch 3 (memorisation of the repeated rare examples, as in run 2), yet epoch 3 has the best macro-F1. Loss-based selection would have picked epoch 1 (0.589). This is a second independent case for D-018 (see `results/training/wandb_export/training_curves.png`, now including run 4).
+- **2×2 ablation at rp 1.1 (val macro-F1):** v1 = 0.432 (run 1), v1 + oversampling = **0.604** (run 4), v2 = 0.379 (run 3), v2 + oversampling = 0.335 (run 2, loss-selected). Oversampling helps with v1 and not with v2; the v2 "not excluded" definition remains the problem (D-022).
+- **W&B export re-run** (`python -m src.train.export_wandb`, key loaded from the git-ignored `.env` into the process only): 4 runs exported, run 4 = `wandb.ai/.../trialspec-lm/runs/ns8kvh36` (31 history rows).
+- **Next:** attempt 12 (final evaluation) re-scores runs 1–4 on val at pure greedy and makes the final choice (D-024). Run 4 is the favourite, but the decision rests on that run.
+
+## Attempt 12: final evaluation, val selection + test once (running, launched 2026-11-10 after run 4)
 - **Run:** Kaggle notebook with `CONFIG = 'final_eval'` → `scripts/kaggle_final_eval.sh`: tests → smoke (`final_eval --smoke`: 4 val examples per model, every adapter downloaded, no test access) → full final evaluation. Protocol: D-024.
 - **Precondition:** run 4 finished and its selected adapter is on `huggingface.co/umairishuman/trialspec-qwen2.5-1.5b-lora-run4`. If the push failed, the smoke stage stops within minutes.
 - **Config** (`configs/final_eval.yaml`): pure greedy (repetition_penalty 1.0), max 64 new tokens, batch 8, fp16. Stage A on val: zeroshot-v1, zeroshot-v2, run1–run4. Selection: max val macro-F1 → val accuracy → config order. Stage B on test: the selected run and the zero-shot baseline with its prompt version.
