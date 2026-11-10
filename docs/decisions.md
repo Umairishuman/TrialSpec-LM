@@ -51,6 +51,7 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-10 | S6 | Every prediction record now carries `pred_evidence_text` and a deterministic evidence-grounded `explanation` (`src/eval/explain.py`); metrics count hallucinated sentence IDs (`n_invalid_ids`) | C1 output fields, C3 validity check | D-024, D-009 | dc1dfb5 |
 | 2026-11-10 | S6 | Error categorisation and case files (`src/eval/error_analysis.py`), confusion-matrix figures (`src/eval/plots.py`); `matplotlib` added to requirements | C4 (≥8 analysed errors), report figures | D-024 | dc1dfb5 |
 | 2026-11-10 | S6 | `compare.row` shows N/A for a missing inclusion/exclusion block | New orchestrator test found a crash: the 4-example smoke sample contains no exclusion criteria | D-024 | dc1dfb5 |
+| 2026-11-10 | S5/S11 | `src/train/export_wandb.py`: pulls every non-smoke W&B run's history to `results/training/wandb_export/*.csv` (+ `runs.json` with run URLs and configs) and draws `training_curves.png` (train/val loss, LR, grad norm). Runs 1–3 exported; run 4 to be added when it finishes | Report needs training curves (B3, H1); user provided W&B access | D-025 | — |
 
 ---
 
@@ -256,4 +257,11 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 - **Error analysis (C4):** errors are categorised automatically: *polarity flip* (included ↔ not included, excluded ↔ not excluded), *missed information* (gold NEI, predicted definite), *spurious NEI* (gold definite, predicted NEI), *applicability* (not applicable confused with anything), *unsupported evidence* (correct label, but no overlap with non-empty gold evidence, or citing sentences when gold cites none), *hallucinated IDs*, *parse failure*. At least 8 are sampled round-robin across categories (deterministic, ordered by annotation_id), with the cited and gold sentences printed. The "why it went wrong" text is written by hand afterwards, from those printed cases, for the report.
 **Why:** selection and reporting then use one fully specified decoding setting, and test is used exactly once, by construction. Re-running val for runs 1–4 also gives the 2×2 ablation table at pure greedy, as D-020 promised.
 **Consequences/risks:** the rp 1.0 ranking could differ from the rp 1.1 ranking in D-022; whatever happens, the rp 1.0 choice is final. Runs 1 and 2 were loss-selected, runs 3 and 4 F1-selected (stated in the report). If a hub adapter is missing (e.g. run 4's push failed), the smoke stage fails within minutes.
+**Status:** accepted
+## D-025: Training curves exported by script from the W&B API (2026-11-10)
+**Context:** the report needs training curves (B3) and run links. Exporting PNGs panel by panel from the W&B web UI is manual, gives inconsistent styling and can't be re-run when run 4 finishes.
+**Options considered:** (a) manual PNG/CSV export from the UI; (b) a script using `wandb.Api()` that saves each run's full history as CSV and draws one consistent figure.
+**Decision:** (b), `python -m src.train.export_wandb`. Smoke runs (group `smoke`) are skipped. The API key is read from `WANDB_API_KEY` in the environment only, never written to code or files. `runs.json` stores run IDs, URLs and configs; Trainer already masks the hub token as `<HUB_TOKEN>` (checked).
+**Why:** reproducible and raw data committed, so the figures can be redrawn without W&B access. The first export (runs 1–3) visibly confirms D-018: run 2's val loss is lowest at epoch 1 and rises afterwards, while runs 1 and 3 bottom out at epoch 2.
+**Consequences/risks:** W&B run names differ from config run names for run 1 (`qwen2.5-1.5b-lora`); a name map gives the figure labels. Runs 1 and 3 have identical LR schedules, so their lines overlap in the LR panel.
 **Status:** accepted
