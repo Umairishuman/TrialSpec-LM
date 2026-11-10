@@ -66,10 +66,10 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-10 | S10 | Markdown report renders decoding/version JSON as code spans | Test caught `repetition\_penalty` escaping in the report (runs.md attempt 14) | D-028 | 424b37a |
 | 2026-11-10 | S10 | App now serves run 4 automatically via `results/final/selection.json` (no code/config change) | Final evaluation selected run 4 | D-028, D-030 | 424b37a |
 | 2026-11-10 | S10 | App CPU dtype bf16 → **fp32**; benchmark default 16 → 8 tokens; About/benchmark texts state measured CPU timings | First real run ~15 s/criterion, uncached 382 s (runs.md attempts 16–18): no native bf16 on this CPU | D-031 | 424b37a |
-| 2026-11-10 | S6 | Hand-written "why it went wrong" for the 12 sampled test errors + a failure-pattern summary in `results/final/error_analysis_test.md` | Rubric C4; runs.md attempt 12 left them to be written | D-024, D-032 | (to be filled) |
-| 2026-11-10 | S11 | IEEE report `report/main.tex` (+ compiled `main.pdf`, 6 pages); figures from `python -m src.report.figures`; app screenshot taken from an exported HTML report with headless Edge | Rubric H1 | D-032 | (to be filled) |
-| 2026-11-10 | S11 | Report figures renamed `fig_*.png` | First compile showed a MiKTeX warning-sign image instead of `attention.png` (name collision in the TeX search path; runs.md attempt 20) | D-032 | (to be filled) |
-| 2026-11-10 | S12 | `README.md` (results, setup, run/test/reproduce commands, data rules, layout); `docs/demo_script.md` (recording plan, narration, paste-ready inputs, fallback fixes, defense Q&A); `.gitignore` for LaTeX build files | Rubric H2/H3, demo | D-032 | (to be filled) |
+| 2026-11-10 | S6 | Hand-written "why it went wrong" for the 12 sampled test errors + a failure-pattern summary in `results/final/error_analysis_test.md` | Rubric C4; runs.md attempt 12 left them to be written | D-024, D-032 | 0e94501 |
+| 2026-11-10 | S11 | IEEE report `report/main.tex` (+ compiled `main.pdf`, 6 pages); figures from `python -m src.report.figures`; app screenshot taken from an exported HTML report with headless Edge | Rubric H1 | D-032 | 0e94501 |
+| 2026-11-10 | S11 | Report figures renamed `fig_*.png` | First compile showed a MiKTeX warning-sign image instead of `attention.png` (name collision in the TeX search path; runs.md attempt 20) | D-032 | 0e94501 |
+| 2026-11-10 | S12 | `README.md` (results, setup, run/test/reproduce commands, data rules, layout); `docs/demo_script.md` (recording plan, narration, paste-ready inputs, fallback fixes, defense Q&A); `.gitignore` for LaTeX build files | Rubric H2/H3, demo | D-032 | 0e94501 |
 
 ---
 
