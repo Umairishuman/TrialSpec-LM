@@ -57,15 +57,15 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-10 | S5 | **Run 4 results recorded** (runs.md attempt 11): val macro-F1 0.604 vs run 1's 0.432 at rp 1.1; run 4 files copied from `results-v4.zip` into `results/` | Run 4 finished | D-027 | 1b45c79 |
 | 2026-11-10 | S5/S11 | W&B export re-run: run 4 history added, `training_curves.png` redrawn with 4 runs | D-025 said to add run 4 when it finished | D-025, D-027 | 1b45c79 |
 | 2026-11-10 | S6 | **Final evaluation recorded** (runs.md attempt 12): run 4 selected; test acc 0.738, macro-F1 0.660, evidence micro-F1 0.544; `results/final/` (incl. `selection.json`, `test_lock.json`) copied from `results-final-eval.zip`. **Test split locked** | Final evaluation finished | D-024, D-030 | af8880b |
-| 2026-11-10 | S10 | **Task 6 app**: `src/app/` (config, text, validate, aggregate, backend, pipeline, bench, render, report, ui, examples, `__main__`), `configs/app.yaml`; `python -m src.app` → localhost:7860, `--prefetch`, `--smoke [--launch]` | Rubric G1–G4 | D-028 | (to be filled) |
-| 2026-11-10 | S10 | Explicit overall-outcome aggregation rule (`src/app/aggregate.py`) | Assignment requires a rule-based patient-level verdict; user approved | D-029 | (to be filled) |
-| 2026-11-10 | S10 | `data/app_examples.json`: 5 example trials (3 val, 2 train; test patients rejected at export, start-up and in tests) | "Load example trial" feature | D-028 | (to be filled) |
-| 2026-11-10 | S10 | `tests/test_app.py` (41 tests: splitting, validation, aggregation, retry/fallback, export, config, examples) | Tests for the non-model app logic | D-028, D-029 | (to be filled) |
-| 2026-11-10 | S10 | `gradio==6.31.0` added to requirements | App framework | D-028 | (to be filled) |
-| 2026-11-10 | S10 | `__main__` reconfigures stdout/stderr with `errors="replace"` | First smoke run crashed printing random model output on the cp1252 Windows console (runs.md attempt 13) | D-028 | (to be filled) |
-| 2026-11-10 | S10 | Markdown report renders decoding/version JSON as code spans | Test caught `repetition\_penalty` escaping in the report (runs.md attempt 14) | D-028 | (to be filled) |
-| 2026-11-10 | S10 | App now serves run 4 automatically via `results/final/selection.json` (no code/config change) | Final evaluation selected run 4 | D-028, D-030 | (to be filled) |
-| 2026-11-10 | S10 | App CPU dtype bf16 → **fp32**; benchmark default 16 → 8 tokens; About/benchmark texts state measured CPU timings | First real run ~15 s/criterion, uncached 382 s (runs.md attempts 16–18): no native bf16 on this CPU | D-031 | (to be filled) |
+| 2026-11-10 | S10 | **Task 6 app**: `src/app/` (config, text, validate, aggregate, backend, pipeline, bench, render, report, ui, examples, `__main__`), `configs/app.yaml`; `python -m src.app` → localhost:7860, `--prefetch`, `--smoke [--launch]` | Rubric G1–G4 | D-028 | 424b37a |
+| 2026-11-10 | S10 | Explicit overall-outcome aggregation rule (`src/app/aggregate.py`) | Assignment requires a rule-based patient-level verdict; user approved | D-029 | 424b37a |
+| 2026-11-10 | S10 | `data/app_examples.json`: 5 example trials (3 val, 2 train; test patients rejected at export, start-up and in tests) | "Load example trial" feature | D-028 | 424b37a |
+| 2026-11-10 | S10 | `tests/test_app.py` (41 tests: splitting, validation, aggregation, retry/fallback, export, config, examples) | Tests for the non-model app logic | D-028, D-029 | 424b37a |
+| 2026-11-10 | S10 | `gradio==6.31.0` added to requirements | App framework | D-028 | 424b37a |
+| 2026-11-10 | S10 | `__main__` reconfigures stdout/stderr with `errors="replace"` | First smoke run crashed printing random model output on the cp1252 Windows console (runs.md attempt 13) | D-028 | 424b37a |
+| 2026-11-10 | S10 | Markdown report renders decoding/version JSON as code spans | Test caught `repetition\_penalty` escaping in the report (runs.md attempt 14) | D-028 | 424b37a |
+| 2026-11-10 | S10 | App now serves run 4 automatically via `results/final/selection.json` (no code/config change) | Final evaluation selected run 4 | D-028, D-030 | 424b37a |
+| 2026-11-10 | S10 | App CPU dtype bf16 → **fp32**; benchmark default 16 → 8 tokens; About/benchmark texts state measured CPU timings | First real run ~15 s/criterion, uncached 382 s (runs.md attempts 16–18): no native bf16 on this CPU | D-031 | 424b37a |
 
 ---
 
