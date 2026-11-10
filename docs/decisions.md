@@ -71,6 +71,7 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-10 | S11 | Report figures renamed `fig_*.png` | First compile showed a MiKTeX warning-sign image instead of `attention.png` (name collision in the TeX search path; runs.md attempt 20) | D-032 | 0e94501 |
 | 2026-11-10 | S12 | `README.md` (results, setup, run/test/reproduce commands, data rules, layout); `docs/demo_script.md` (recording plan, narration, paste-ready inputs, fallback fixes, defense Q&A); `.gitignore` for LaTeX build files | Rubric H2/H3, demo | D-032 | 0e94501 |
 | 2026-11-10 | S12 | Demo video uploaded to Google Drive and linked from the README; `recording/` (278 MB mp4) added to `.gitignore` so it is not committed | Submission checklist item "demo video link" (H2/H3) | D-032 | see git log |
+| 2026-11-10 | S11/S12 | Report title block and Reproducibility section now list the GitHub, HF run-4 adapter and Drive demo-video URLs (`\hfurl`, `ideourl` macros); PDF recompiled | Video link was missing from the report (submission checklist H2/H3) | D-032 | see git log |
 
 ---
 

@@ -20,6 +20,8 @@
 \newcommand{\rollno}{Roll No.\ XXXX}               % TODO: fill in
 \newcommand{\affil}{FAST-NUCES}                    % TODO: check
 \newcommand{\repourl}{https://github.com/Umairishuman/TrialSpec-LM}
+\newcommand{\hfurl}{https://huggingface.co/umairishuman/trialspec-qwen2.5-1.5b-lora-run4}
+\newcommand{\videourl}{https://drive.google.com/file/d/1bRcu7PCX7ZL3rSs98bDm_kMLhnFrL_SC/view?usp=sharing}
 % -------------------------------------------------------------
 
 \begin{document}
@@ -27,7 +29,7 @@
 \title{TrialSpec-LM: A Fine-Tuned Small Transformer for Evidence-Grounded Clinical-Trial Criterion Matching, with Hand-Written KV Caching, Tiled Attention and Speculative Decoding}
 
 \author{\IEEEauthorblockN{\authorname\ (\rollno)}
-\IEEEauthorblockA{Generative AI, Assignment 2 \\ \affil \\ Code: \url{\repourl}}}
+\IEEEauthorblockA{Generative AI, Assignment 2 \\ \affil \\ Code: \url{\repourl} \\ Adapter: \url{\hfurl} \\ Demo video: \url{\videourl}}}
 
 \maketitle
 
@@ -311,7 +313,7 @@ On the laptop CPU, bf16 turned out 2.3$\times$ \emph{slower} than fp32 for promp
 A LoRA-tuned 1.5B open model learns the TrialGPT criterion task from 603 examples to 0.738 accuracy and 0.660 macro-F1 on held-out patients, with grounded, checkable evidence and no format failures, and runs on a laptop CPU. The choice between prompt wordings and the use of oversampling mattered more than any other setting, and selecting checkpoints by the reported metric rather than loss was necessary. Our KV cache, tiled attention and speculative decoder reproduce the expected correctness and trade-offs, and the measurements explain when they do and do not pay off on this hardware. Future work: a fine-tuned shallow draft model, CUDA graphs for decoding, and resolving the silent-note label convention before training.
 
 \section*{Reproducibility}
-Code, configs, split manifest, results and logs: \url{\repourl}. Adapters: \url{https://huggingface.co/umairishuman/trialspec-qwen2.5-1.5b-lora-run4} (final) and runs 1--3 under the same account. W\&B project: \texttt{trialspec-lm}. Commands are listed in the README.
+Code, configs, split manifest, results and logs: \url{\repourl}. Final adapter (run 4): \url{\hfurl}; runs 1--3 are under the same account. Demo video: \url{\videourl}. W\&B project: \texttt{trialspec-lm}. Commands are listed in the README.
 
 \appendix
 \section*{AI-Use Appendix}
