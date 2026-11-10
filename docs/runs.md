@@ -26,6 +26,7 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 17 | 2026-11-10 | Laptop CPU | bf16 vs fp32 prefill/decode timing (scratch) | **Success** | fp32 prefill 5.4 s vs bf16 12.6 s (284 tokens); decode 2.2 vs 3.0 tok/s → app switched to fp32 (D-031) |
 | 18 | 2026-11-10 | Laptop CPU | app real-model check, **run 4**, fp32, offline | **Success** | ~10.8 s/criterion after the first (25.8 s warm-up); uncached benchmark 47.6 s for 8 tokens; 4/6 labels match experts; all modes token-identical |
 | 19 | 2026-11-10 | Laptop CPU | `python -m src.app` (real server, run 4, fp32, offline) driven through the Gradio API | **Success** | Starts in ~23 s; validation errors shown; unseen 4-criterion note screened in 46.7 s; live benchmark 4/4 modes identical |
+| 20 | 2026-11-10 | Laptop | report figures + LaTeX build (MiKTeX) | **Success** after 1 fix | First PDF showed a foreign warning-sign image for `attention.png`; renamed figures `fig_*`; 6-page PDF |
 
 ---
 
@@ -390,3 +391,9 @@ Benchmark, criterion I1, 8 new tokens, fp32:
   - E2 "Pregnancy" → not excluded, cites [3] ("She is not pregnant") ✔
 - **Live benchmark (G3):** custom prompt "Name one symptom of diabetes." (35 tokens), 4 new tokens, k=2, all 4 modes, 24 s for the whole request: uncached 4.43 s, HF cache 1.89 s (2.34×), hand-written cache 1.94 s (2.29×), speculative 3.33 s (1.33×; acceptance 0.50, 3 target passes). Tokens identical in every mode; KV cache 2.1 MiB (target) / 3.1 MiB (target + draft).
 - **Note:** the `gradio_client` test script first crashed printing 🟠 to the cp1252 console (the same issue as attempt 13, in the test script, not the app); re-run with `PYTHONIOENCODING=utf-8`.
+
+## Attempt 20: report figures and LaTeX build
+- **Run:** `python -m src.report.figures --smoke`, then without `--smoke` (6 PNGs); headless Edge screenshot of the exported HTML report from attempt 19; `latexmk -pdf main.tex` with MiKTeX.
+- **What happened:** the first build compiled without errors (7 pages), but reading the rendered PDF showed three problems: (1) Fig. 5 was a large red warning-sign bitmap instead of our attention plot; (2) Tables II and IV were wider than the column; (3) Eq. (1) ran into the next column.
+- **Why:** (1) `\includegraphics{attention.png}` searches the TeX tree as well as `\graphicspath`, and MiKTeX ships an unrelated `attention.png`, so a generic file name was silently resolved to the wrong image. No warning is printed, which is why the rendered PDF has to be checked. (2–3) Layout.
+- **Fix:** all figures renamed `fig_*.png` (script and `main.tex`); tables wrapped in `\resizebox{\columnwidth}`; the update equations split over three aligned lines; `--` in `\texttt` escaped. **Result:** 6-page PDF, no undefined references, no overfull boxes reported; every figure checked visually.

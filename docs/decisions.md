@@ -66,6 +66,10 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-10 | S10 | Markdown report renders decoding/version JSON as code spans | Test caught `repetition\_penalty` escaping in the report (runs.md attempt 14) | D-028 | 424b37a |
 | 2026-11-10 | S10 | App now serves run 4 automatically via `results/final/selection.json` (no code/config change) | Final evaluation selected run 4 | D-028, D-030 | 424b37a |
 | 2026-11-10 | S10 | App CPU dtype bf16 → **fp32**; benchmark default 16 → 8 tokens; About/benchmark texts state measured CPU timings | First real run ~15 s/criterion, uncached 382 s (runs.md attempts 16–18): no native bf16 on this CPU | D-031 | 424b37a |
+| 2026-11-10 | S6 | Hand-written "why it went wrong" for the 12 sampled test errors + a failure-pattern summary in `results/final/error_analysis_test.md` | Rubric C4; runs.md attempt 12 left them to be written | D-024, D-032 | (to be filled) |
+| 2026-11-10 | S11 | IEEE report `report/main.tex` (+ compiled `main.pdf`, 6 pages); figures from `python -m src.report.figures`; app screenshot taken from an exported HTML report with headless Edge | Rubric H1 | D-032 | (to be filled) |
+| 2026-11-10 | S11 | Report figures renamed `fig_*.png` | First compile showed a MiKTeX warning-sign image instead of `attention.png` (name collision in the TeX search path; runs.md attempt 20) | D-032 | (to be filled) |
+| 2026-11-10 | S12 | `README.md` (results, setup, run/test/reproduce commands, data rules, layout); `docs/demo_script.md` (recording plan, narration, paste-ready inputs, fallback fixes, defense Q&A); `.gitignore` for LaTeX build files | Rubric H2/H3, demo | D-032 | (to be filled) |
 
 ---
 
@@ -352,4 +356,11 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 **Decision:** (b) `dtype: float32` in `configs/app.yaml` (no code change). Estimated per criterion (~290 prompt + ~17 answer tokens): bf16 ≈ 12.6 + 5.7 ≈ 18 s, fp32 ≈ 5.4 + 7.7 ≈ 13 s. The uncached benchmark mode gets 2.3× faster per step, and its default length drops from 16 to 8 tokens (~45 s instead of minutes).
 **Why also for fidelity:** the reported metrics were produced in fp16 on a T4. fp32 is closer to that than bf16 (bf16 keeps 8 mantissa bits, fp16 10), so near-tie flips relative to the evaluated predictions (D-019/D-023) become rarer.
 **Consequences/risks:** RAM ~8.2 GB for both models (target 6.2 + draft 2.0) instead of ~4.4 GB, which fits in 15.7 GB but leaves less headroom for the browser and screen recorder during the demo. A 20-criterion trial now takes ~4–5 minutes; the progress bar shows each criterion.
+**Status:** accepted
+## D-032: Report, README and demo materials are built from committed results only (2026-11-10)
+**Context:** the report (H1), README (H2) and demo (H2/H3) must state numbers that a grader can trace and regenerate. The deadline is today, so manual figure exports are a risk.
+**Options considered:** (a) figures exported by hand from W&B/notebooks and pasted in; (b) a script that draws every figure from the committed JSON/PNG results, plus a LaTeX report compiled locally (MiKTeX is installed) and committed as PDF; (c) a Markdown report converted to PDF (not IEEE format; rejected).
+**Decision:** (b). `python -m src.report.figures` (with `--smoke`) draws the KV-cache, attention and speculative figures from `results/*/benchmark_cuda_*.json` and copies the training-curve and confusion-matrix PNGs into `report/figures/`. The application figure is a headless-Edge screenshot (light colour scheme) of a report exported by the app in runs.md attempt 19, not a mock-up. Every number in the report comes from `docs/runs.md` / `results/`; author name, roll number and affiliation are placeholders at the top of `main.tex` for the author to confirm. The error-analysis "why" text was written after reading each case's note and criterion. Recurring causes are: the silent-note convention, clinical inference from vital signs, numeric thresholds, compound criteria, surface matching, vague criteria, and evidence-metric limits.
+**Why:** traceable and re-runnable; the report can be rebuilt after any correction with two commands.
+**Consequences/risks:** figure files need unique names: MiKTeX's search path contains an unrelated `attention.png`, which silently replaced our figure in the first build. Figures are now prefixed `fig_`. Live UI screenshots (Gradio needs interaction) are left to the demo recording; the report includes `fig_app_ui.png` automatically if it is added.
 **Status:** accepted
