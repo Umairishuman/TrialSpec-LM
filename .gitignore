@@ -20,3 +20,4 @@ results-*.zip
 report/*.fls
 report/*.fdb_latexmk
 report/build.log
+recording/

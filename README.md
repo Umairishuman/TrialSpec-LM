@@ -34,6 +34,7 @@ Full tables: [results/final/summary.md](results/final/summary.md). Error analysi
 **Links**
 - Report (IEEE format): [report/main.pdf](report/main.pdf) (source: [report/main.tex](report/main.tex))
 - Final adapter: <https://huggingface.co/umairishuman/trialspec-qwen2.5-1.5b-lora-run4> (runs 1–3: `…-lora`, `…-lora-run2`, `…-lora-run3`)
+- Demo video (screening app walkthrough): <https://drive.google.com/file/d/1bRcu7PCX7ZL3rSs98bDm_kMLhnFrL_SC/view?usp=sharing>
 - Training curves: W&B project `trialspec-lm`; exported histories and figure in [results/training/wandb_export/](results/training/wandb_export/)
 - Split manifest: [data/splits/split_manifest.json](data/splits/split_manifest.json)
 - Decision log (every design choice, failure and reversal): [docs/decisions.md](docs/decisions.md)
