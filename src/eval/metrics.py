@@ -70,4 +70,7 @@ def full_report(records: list[dict]) -> dict:
     all_labels = LABELS["inclusion"] + [l for l in LABELS["exclusion"] if l not in LABELS["inclusion"]]
     out["overall"] = classification_report([r["gold_label"] for r in records], [r["pred_label"] for r in records], all_labels)
     out["evidence"] = evidence_scores([r["gold_evidence"] for r in records], [r["pred_evidence"] for r in records])
+    # Validity check (C3): cited IDs that do not exist in the note are dropped before scoring and counted here.
+    out["evidence"]["n_invalid_ids"] = sum(len(r.get("invalid_ids", [])) for r in records)
+    out["evidence"]["n_records_with_invalid_ids"] = sum(bool(r.get("invalid_ids")) for r in records)
     return out

@@ -7,6 +7,7 @@ transformers==5.22.1
 peft==0.21.2
 accelerate==1.15.0
 scikit-learn
+matplotlib
 wandb
 python-dotenv
 pyyaml

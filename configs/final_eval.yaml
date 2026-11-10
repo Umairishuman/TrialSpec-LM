@@ -1,0 +1,21 @@
+# Final evaluation (Task 2; protocol in docs/decisions.md D-024).
+# Stage A: every model below on VAL at pure greedy. Stage B: the selected fine-tuned model and the
+# zero-shot baseline with the same prompt version on TEST, exactly once (guarded by test_lock.json).
+model_id: Qwen/Qwen2.5-1.5B-Instruct
+out_dir: results/final
+decoding:
+  repetition_penalty: 1.0      # pure greedy (D-020); runs 1-4 val numbers in results/finetuned used 1.1
+  max_new_tokens: 64
+  batch_size: 8
+selection: val_macro_f1        # tie -> val accuracy -> earlier entry in `candidates`
+error_cases: 12                # cases printed per split (rubric asks for >= 8)
+
+baselines:
+  - {name: zeroshot-v1, adapter: null, prompt_version: v1}
+  - {name: zeroshot-v2, adapter: null, prompt_version: v2}
+
+candidates:                    # each run's selected adapter on the HF Hub
+  - {name: run1, adapter: umairishuman/trialspec-qwen2.5-1.5b-lora, prompt_version: v1}
+  - {name: run2, adapter: umairishuman/trialspec-qwen2.5-1.5b-lora-run2, prompt_version: v2}
+  - {name: run3, adapter: umairishuman/trialspec-qwen2.5-1.5b-lora-run3, prompt_version: v2}
+  - {name: run4, adapter: umairishuman/trialspec-qwen2.5-1.5b-lora-run4, prompt_version: v1}

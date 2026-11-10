@@ -10,6 +10,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
 from src.data.dataset import load_split_frames, prompt_text
 from src.data.prompt import parse_output
+from src.eval.explain import evidence_text, explanation
 from src.eval.metrics import full_report
 from src.utils import git_commit, library_versions, load_env
 
@@ -48,11 +49,14 @@ def predict_frame(tok, model, frame, batch_size: int, max_new_tokens: int, promp
         for r, t in zip(chunk, texts):
             valid = {i for i, _ in r["sentences"]}
             p = parse_output(t, r["criterion_type"], valid)
+            cited = evidence_text(r["sentences"], p["evidence_ids"])
             out.append({
                 "annotation_id": int(r["annotation_id"]), "patient_id": r["patient_id"], "trial_id": r["trial_id"],
                 "criterion_type": r["criterion_type"], "criterion_text": r["criterion_text"],
                 "gold_label": r["expert_eligibility"], "gold_evidence": list(r["expert_sentences"]),
                 "pred_label": p["label"], "pred_evidence": p["evidence_ids"], "invalid_ids": p["invalid_ids"],
+                "pred_evidence_text": cited,
+                "explanation": explanation(r["criterion_type"], p["label"], cited),
                 "parse_ok": p["parse_ok"], "raw": t,
             })
         print(f"  {min(i + batch_size, len(rows))}/{len(rows)}", flush=True)
@@ -88,33 +92,45 @@ def main():
     if args.limit:
         frame = frame.head(args.limit)
 
+    evaluate_and_write(tok, model, frame, args.out, model_id=args.model, adapter=args.adapter, split=args.split,
+                       prompt_version=args.prompt_version, batch_size=args.batch_size,
+                       max_new_tokens=args.max_new_tokens, repetition_penalty=args.repetition_penalty, dtype=dtype)
+
+
+def evaluate_and_write(tok, model, frame, out: Path, *, model_id: str, adapter: str | None, split: str,
+                       prompt_version: str, batch_size: int, max_new_tokens: int, repetition_penalty: float,
+                       dtype, extra_meta: dict | None = None) -> dict:
+    """Predict on `frame`, write <out>.jsonl and <out>.metrics.json, return {"meta", "metrics"}."""
     t0 = time.perf_counter()
-    records = predict_frame(tok, model, frame, args.batch_size, args.max_new_tokens, args.prompt_version,
-                            args.repetition_penalty)
+    records = predict_frame(tok, model, frame, batch_size, max_new_tokens, prompt_version, repetition_penalty)
     elapsed = time.perf_counter() - t0
 
     report = full_report(records)
     meta = {
-        "model": args.model, "adapter": args.adapter, "prompt_version": args.prompt_version,
-        "split": args.split, "n": len(records),
-        "decoding": {"strategy": "greedy", "do_sample": False, "num_beams": 1, "max_new_tokens": args.max_new_tokens,
-                     "repetition_penalty": args.repetition_penalty, "batch_size": args.batch_size,
+        "model": model_id, "adapter": adapter, "prompt_version": prompt_version,
+        "split": split, "n": len(records),
+        "decoding": {"strategy": "greedy", "do_sample": False, "num_beams": 1, "max_new_tokens": max_new_tokens,
+                     "repetition_penalty": repetition_penalty, "batch_size": batch_size,
                      "padding": "left", "eos": ["<|im_end|>", "<|endoftext|>"]},
-        "dtype": str(dtype), "device": torch.cuda.get_device_name(0) if device == "cuda" else "cpu",
+        "dtype": str(dtype), "device": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu",
         "git_commit": git_commit(), "versions": library_versions(),
         "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"), "seconds": round(elapsed, 1),
         "parse_ok_rate": sum(r["parse_ok"] for r in records) / max(len(records), 1),
+        **(extra_meta or {}),
     }
-    args.out.parent.mkdir(parents=True, exist_ok=True)
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
     # Append suffixes instead of with_suffix(): names like "qwen2.5-1.5b_val" contain dots.
-    with open(f"{args.out}.jsonl", "w") as f:
+    with open(f"{out}.jsonl", "w") as f:
         for r in records:
             f.write(json.dumps(r) + "\n")
-    Path(f"{args.out}.metrics.json").write_text(json.dumps({"meta": meta, "metrics": report}, indent=2))
+    result = {"meta": meta, "metrics": report}
+    Path(f"{out}.metrics.json").write_text(json.dumps(result, indent=2))
 
     o = report["overall"]
     print(f"accuracy={o['accuracy']:.3f} macro_f1={o['macro_f1']:.3f} parse_ok={meta['parse_ok_rate']:.3f} "
           f"evidence_micro_f1={report['evidence']['micro']['f1']:.3f} ({elapsed:.0f}s)")
+    return result
 
 
 if __name__ == "__main__":

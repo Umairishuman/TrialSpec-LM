@@ -4,11 +4,17 @@ import json
 from pathlib import Path
 
 
+def _f(block: dict | None, key: str) -> str:
+    """Formats a metric; a subset with no records (e.g. no exclusion criteria in a smoke sample) shows N/A."""
+    v = (block or {}).get(key)
+    return "N/A" if v is None else f"{v:.3f}"
+
+
 def row(name: str, path: Path) -> str:
     m = json.loads(path.read_text())
     r, me = m["metrics"], m["meta"]
-    return (f"| {name} | {me.get('prompt_version') or 'v1'} | {r['overall']['accuracy']:.3f} | {r['overall']['macro_f1']:.3f} | "
-            f"{r['inclusion']['macro_f1']:.3f} | {r['exclusion']['macro_f1']:.3f} | {r['evidence']['micro']['f1']:.3f} | "
+    return (f"| {name} | {me.get('prompt_version') or 'v1'} | {_f(r['overall'], 'accuracy')} | {_f(r['overall'], 'macro_f1')} | "
+            f"{_f(r.get('inclusion'), 'macro_f1')} | {_f(r.get('exclusion'), 'macro_f1')} | {r['evidence']['micro']['f1']:.3f} | "
             f"{r['evidence']['macro']['f1']:.3f} | {me['parse_ok_rate']:.0%} | {me['git_commit'][:7]} |")
 
 
