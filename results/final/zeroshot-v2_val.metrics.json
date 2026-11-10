@@ -1,0 +1,334 @@
+{
+  "meta": {
+    "model": "Qwen/Qwen2.5-1.5B-Instruct",
+    "adapter": null,
+    "prompt_version": "v2",
+    "split": "val",
+    "n": 206,
+    "decoding": {
+      "strategy": "greedy",
+      "do_sample": false,
+      "num_beams": 1,
+      "max_new_tokens": 64,
+      "repetition_penalty": 1.0,
+      "batch_size": 8,
+      "padding": "left",
+      "eos": [
+        "<|im_end|>",
+        "<|endoftext|>"
+      ]
+    },
+    "dtype": "torch.float16",
+    "device": "Tesla T4",
+    "git_commit": "e13346a73acd4b69481f663b4e4182212190f9ca",
+    "versions": {
+      "torch": "2.11.0+cu130",
+      "transformers": "5.22.1",
+      "peft": "0.21.2",
+      "accelerate": "1.15.0",
+      "datasets": "5.1.0",
+      "numpy": "2.1.3",
+      "pandas": "2.3.3",
+      "scikit-learn": "1.6.1"
+    },
+    "created_utc": "2026-11-10T04:21:18+00:00",
+    "seconds": 29.9,
+    "parse_ok_rate": 1.0,
+    "final_eval_name": "zeroshot-v2"
+  },
+  "metrics": {
+    "inclusion": {
+      "n": 66,
+      "accuracy": 0.24242424242424243,
+      "macro_f1": 0.1111111111111111,
+      "invalid_rate": 0.0,
+      "per_class": {
+        "included": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 35
+        },
+        "not included": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 3
+        },
+        "not enough information": {
+          "precision": 0.35555555555555557,
+          "recall": 0.5925925925925926,
+          "f1": 0.4444444444444444,
+          "support": 27
+        },
+        "not applicable": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 1
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "included",
+          "not included",
+          "not enough information",
+          "not applicable",
+          "<invalid>"
+        ],
+        "matrix": [
+          [
+            0,
+            0,
+            25,
+            10,
+            0
+          ],
+          [
+            0,
+            0,
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            16,
+            11,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    "exclusion": {
+      "n": 140,
+      "accuracy": 0.14285714285714285,
+      "macro_f1": 0.09741176470588236,
+      "invalid_rate": 0.0,
+      "per_class": {
+        "excluded": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 2
+        },
+        "not excluded": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 101
+        },
+        "not enough information": {
+          "precision": 0.1717171717171717,
+          "recall": 0.6538461538461539,
+          "f1": 0.272,
+          "support": 26
+        },
+        "not applicable": {
+          "precision": 0.075,
+          "recall": 0.2727272727272727,
+          "f1": 0.11764705882352941,
+          "support": 11
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "excluded",
+          "not excluded",
+          "not enough information",
+          "not applicable",
+          "<invalid>"
+        ],
+        "matrix": [
+          [
+            0,
+            0,
+            2,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            72,
+            28,
+            0
+          ],
+          [
+            0,
+            0,
+            17,
+            9,
+            0
+          ],
+          [
+            0,
+            0,
+            8,
+            3,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    "overall": {
+      "n": 206,
+      "accuracy": 0.17475728155339806,
+      "macro_f1": 0.06953619358876295,
+      "invalid_rate": 0.0,
+      "per_class": {
+        "included": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 35
+        },
+        "not included": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 3
+        },
+        "not enough information": {
+          "precision": 0.22916666666666666,
+          "recall": 0.6226415094339622,
+          "f1": 0.3350253807106599,
+          "support": 53
+        },
+        "not applicable": {
+          "precision": 0.04918032786885246,
+          "recall": 0.25,
+          "f1": 0.0821917808219178,
+          "support": 12
+        },
+        "excluded": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 2
+        },
+        "not excluded": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 101
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "included",
+          "not included",
+          "not enough information",
+          "not applicable",
+          "excluded",
+          "not excluded",
+          "<invalid>"
+        ],
+        "matrix": [
+          [
+            0,
+            0,
+            25,
+            10,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            3,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            33,
+            20,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            9,
+            3,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            72,
+            28,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    "evidence": {
+      "micro": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "macro": {
+        "precision": 0.5631067961165048,
+        "recall": 0.5631067961165048,
+        "f1": 0.5631067961165048
+      },
+      "n_gold_empty": 116,
+      "n_pred_empty": 206,
+      "n_both_empty": 116,
+      "n_invalid_ids": 0,
+      "n_records_with_invalid_ids": 0
+    }
+  }
+}

@@ -18,7 +18,7 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 9 | 2026-11-06 | Kaggle T4 | benchmarks (Tasks 3–5) / 78cdfab | **Success** (2,983 s) | KV cache 9.3× decode speed-up; tiled attn correct but slow; speculative exact, 0.61–0.80× |
 | 10 | 2026-11-10 | Kaggle T4 | run4 / 14eb0b5 | Failed in 1 min | `kaggle_pipeline.sh: line 19: $2: unbound variable` |
 | 11 | 2026-11-10 | Kaggle T4 | run4 / 326900a | **Success**, best val so far | Selected epoch 3 (ckpt-138): val acc 0.743, macro-F1 0.604 (rp 1.1); gain mostly from "excluded" (n=2) and exclusion NEI |
-| 12 | 2026-11-10 | Kaggle T4 | final_eval / (to be filled) | Running | — |
+| 12 | 2026-11-10 | Kaggle T4 | final_eval / e13346a | **Success**, test locked | Selected run4 (val mF1 0.604); **test acc 0.738, macro-F1 0.660**, evidence micro-F1 0.544 (zero-shot: 0.136 / 0.131 / 0.000) |
 
 ---
 
@@ -254,11 +254,38 @@ Per-class F1 (support), run 4 epoch 3 vs run 1:
 - **W&B export re-run** (`python -m src.train.export_wandb`, key loaded from the git-ignored `.env` into the process only): 4 runs exported, run 4 = `wandb.ai/.../trialspec-lm/runs/ns8kvh36` (31 history rows).
 - **Next:** attempt 12 (final evaluation) re-scores runs 1–4 on val at pure greedy and makes the final choice (D-024). Run 4 is the favourite, but the decision rests on that run.
 
-## Attempt 12: final evaluation, val selection + test once (running, launched 2026-11-10 after run 4)
+## Attempt 12: final evaluation, val selection + test once (completed 2026-11-10)
 - **Run:** Kaggle notebook with `CONFIG = 'final_eval'` → `scripts/kaggle_final_eval.sh`: tests → smoke (`final_eval --smoke`: 4 val examples per model, every adapter downloaded, no test access) → full final evaluation. Protocol: D-024.
 - **Precondition:** run 4 finished and its selected adapter is on `huggingface.co/umairishuman/trialspec-qwen2.5-1.5b-lora-run4`. If the push failed, the smoke stage stops within minutes.
 - **Config** (`configs/final_eval.yaml`): pure greedy (repetition_penalty 1.0), max 64 new tokens, batch 8, fp16. Stage A on val: zeroshot-v1, zeroshot-v2, run1–run4. Selection: max val macro-F1 → val accuracy → config order. Stage B on test: the selected run and the zero-shot baseline with its prompt version.
 - **Hypotheses:** (a) removing the 1.1 repetition penalty changes val macro-F1 only slightly (≤ 0.03), because answers are short JSON whose repeated tokens (`"`, `,`) are mostly scaffold; (b) the val ranking among runs 1–4 is the same as at 1.1; (c) val and test macro-F1 of the selected model differ by less than 0.1. With 8 patients per split the variance is large, and "excluded" has no test examples (D-006).
 - **Expected time:** about 20 min (6 model loads for smoke + 6 val passes of ~40 s + 2 test passes + model loads).
 - **After the run:** download as `results-final.zip`, copy `results/final/` into the repo and **commit `test_lock.json`**, which locks the test split. Then write the "why" for each error case in `error_analysis_test.md`.
-- **Results:** (to be filled in)
+- **Outcome:** completed on a Tesla T4, commit e13346a. Selection written 04:24:08 UTC; test evaluated once, `test_lock.json` written 04:25:16 UTC. The downloaded zip is `results-final-eval.zip` (not `results-final.zip` as planned). `results/final/` (37 files) and `results/smoke/final/` were copied into the repo. The rest of the zip holds older copies of files the repo already has, so those were not copied. **`test_lock.json` is committed, so the test split is now locked** (D-024). This evaluation does not log to W&B; the W&B export was re-run anyway and returned the same 4 training runs with byte-identical files.
+- **Stage A (val, n=206, pure greedy):**
+
+| Model | Prompt | Acc | Macro-F1 | Incl. mF1 | Excl. mF1 | Evid. micro-F1 | Evid. macro-F1 | Parse OK |
+|---|---|---|---|---|---|---|---|---|
+| zeroshot-v1 | v1 | 0.068 | 0.054 | 0.064 | 0.074 | 0.000 | 0.563 | 100% |
+| zeroshot-v2 | v2 | 0.175 | 0.070 | 0.111 | 0.097 | 0.000 | 0.563 | 100% |
+| run1 | v1 | 0.743 | 0.432 | 0.360 | 0.401 | 0.554 | 0.745 | 100% |
+| run2 | v2 | 0.704 | 0.335 | 0.343 | 0.210 | 0.468 | 0.688 | 100% |
+| run3 | v2 | 0.728 | 0.379 | 0.374 | 0.252 | 0.556 | 0.740 | 100% |
+| **run4 (selected)** | v1 | **0.743** | **0.604** | 0.368 | **0.676** | 0.520 | 0.717 | 100% |
+
+- **Selection:** run4 (`umairishuman/trialspec-qwen2.5-1.5b-lora-run4`) by val macro-F1; its zero-shot counterpart is zeroshot-v1.
+- **Stage B (test, n=206, pure greedy, run once):**
+
+| Model | Acc | Macro-F1 | Incl. mF1 | Excl. mF1 | Evid. micro P / R / F1 | Evid. macro-F1 | Invalid IDs | Parse OK |
+|---|---|---|---|---|---|---|---|---|
+| zeroshot-v1 | 0.136 | 0.131 | 0.158 | 0.132 | 0 / 0 / 0.000 | 0.704 | 0 | 100% |
+| **run4** | **0.738** | **0.660** | **0.664** | **0.514** | 0.463 / 0.660 / **0.544** | **0.778** | 0 | 100% |
+
+Test per-class F1 for run4 (support): included 0.863 (27), not included 0.429 (7), inclusion NEI 0.864 (38), inclusion N/A 0.500 (3); exclusion "excluded" N/A (0 examples), not excluded 0.816 (91), **exclusion NEI 0.154 (28; recall 0.107)**, exclusion N/A 0.571 (12). Test macro-F1 averages 7 classes, because "excluded" has no test support (D-011). 145 of 206 test gold evidence sets are empty, which inflates evidence macro-F1, so micro-F1 is the main evidence metric (D-015).
+- **Hypotheses:**
+  - (a) Confirmed, and more strongly than predicted. Pure greedy changes **1 of 1,236** val outputs relative to repetition_penalty 1.1 (one evidence list in run 2; 0 label changes in any model). Every val metric except run 2's evidence (micro-F1 0.477 → 0.468) is identical to the rp 1.1 numbers. The hidden penalty (D-020) did not affect any earlier conclusion.
+  - (b) Confirmed: the ranking is identical (run4 > run1 > run3 > run2).
+  - (c) Confirmed: val 0.604 vs test 0.660 (difference 0.056 < 0.1). The two averages use different class sets (8 vs 7 classes), so the comparison is loose.
+- **Error analysis:** test has 54 wrong labels out of 206 (26.2%). By category: missed_information 28, unsupported_evidence 30 (correct label), spurious_nei 16, applicability 6, polarity_flip 4, hallucinated IDs 0, parse failures 0. 12 cases are printed per split in `error_analysis_{val,test}.md`. The "why it went wrong" text is still to be written by hand (report task).
+- **Main weakness:** exclusion "not enough information". The model mostly answers "not excluded" when the note is silent (recall 0.107 on test), which is the D-016 tension between expert convention and the no-evidence rule. The app flags these decisions as "no supporting evidence cited".
+- **Before/after (B4, same 206 test examples, identical decoding):** accuracy 0.136 → 0.738, macro-F1 0.131 → 0.660, evidence micro-F1 0.000 → 0.544.

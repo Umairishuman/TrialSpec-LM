@@ -1,0 +1,26 @@
+{
+  "criterion": "max val macro-F1 at pure greedy (tie: val accuracy, then config order); D-024",
+  "selected": "run3",
+  "adapter": "umairishuman/trialspec-qwen2.5-1.5b-lora-run3",
+  "baseline": "zeroshot-v2",
+  "val": {
+    "run1": {
+      "macro_f1": 0.7333333333333334,
+      "accuracy": 0.75
+    },
+    "run2": {
+      "macro_f1": 0.7333333333333334,
+      "accuracy": 0.75
+    },
+    "run3": {
+      "macro_f1": 1.0,
+      "accuracy": 1.0
+    },
+    "run4": {
+      "macro_f1": 1.0,
+      "accuracy": 1.0
+    }
+  },
+  "git_commit": "e13346a73acd4b69481f663b4e4182212190f9ca",
+  "created_utc": "2026-11-10T04:19:56+00:00"
+}

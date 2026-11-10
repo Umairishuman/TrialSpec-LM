@@ -56,6 +56,7 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-10 | S10 | App hosting: run locally on the laptop (CPU, bf16, target 1.5B + draft 0.5B); optional HF Space only as a public backup. Reverses the 2026-11-05 "HF Space" plan | Measured: laptop ran both models in bf16 (runs.md attempt 8, 5.4 tok/s); free Space has 2 shared vCPUs | D-026 | e8197a1 |
 | 2026-11-10 | S5 | **Run 4 results recorded** (runs.md attempt 11): val macro-F1 0.604 vs run 1's 0.432 at rp 1.1; run 4 files copied from `results-v4.zip` into `results/` | Run 4 finished | D-027 | 1b45c79 |
 | 2026-11-10 | S5/S11 | W&B export re-run: run 4 history added, `training_curves.png` redrawn with 4 runs | D-025 said to add run 4 when it finished | D-025, D-027 | 1b45c79 |
+| 2026-11-10 | S6 | **Final evaluation recorded** (runs.md attempt 12): run 4 selected; test acc 0.738, macro-F1 0.660, evidence micro-F1 0.544; `results/final/` (incl. `selection.json`, `test_lock.json`) copied from `results-final-eval.zip`. **Test split locked** | Final evaluation finished | D-024, D-030 | (to be filled) |
 
 ---
 
@@ -285,4 +286,53 @@ The 0.5B and 1.5B tokenizers are identical: same vocab and same special tokens, 
 3. Val loss is again lowest at epoch 1 (0.121) and highest at the selected epoch 3 (0.135). This is a second independent confirmation of D-018: loss-based selection would have picked a worse model (macro-F1 0.589).
 **Decision:** no new model choice is made here. Under D-022's rule run 4 would replace run 1, but the binding choice is the pure-greedy val re-scoring in the final evaluation (D-024, runs.md attempt 12), which is already running. The app (Task 6) takes its adapter from config, so whichever model `results/final/selection.json` names can be used without code changes.
 **Consequences/risks:** with 8 val patients and supports of 1–3 for four classes, rankings between runs are noisy. This is stated as a limitation, and is not fixed by more tuning on val (overfitting risk; no time).
+**Status:** accepted
+## D-028: Task 6 application design (2026-11-10)
+**Context:** rubric G1–G4 needs a browser application that starts without an IDE, validates inputs and recovers from errors (G1), takes an unseen note and criteria and shows each decision, its evidence, missing information and an overall preliminary outcome (G2), exposes the decoding mechanisms with live measurements rather than static charts (G3), and exports a readable report with provenance (G4). Hosting is the laptop CPU (D-026).
+**Options considered:**
+- *Framework:* Gradio vs FastAPI + hand-written HTML/JS. Gradio gives progress bars, tabs, file downloads and a request queue for free; FastAPI would mean writing a frontend under deadline pressure.
+- *Screening generation path:* `model.generate` with the explicit `greedy_config` (D-020) vs our manual KV-cached decoder. `generate` with the same settings is exactly the path that produced the reported metrics (`src/eval/predict.py`), so app outputs match the evaluated system. The manual decoders are shown in the benchmark tab instead.
+- *Malformed model output:* (a) show "unparseable" and stop; (b) re-run the same greedy call (pointless: greedy is deterministic, so it returns the same text); (c) retry with a larger token budget only when the output was cut off, then fall back to **constrained label scoring**: score the full training-format answer `{"evidence_ids": [...], "label": "<L>"}` for each of the 4 allowed labels (sum of token log-probabilities under the same prompt) and take the best one, reusing any evidence IDs salvaged from the broken output.
+- *Prefix KV reuse across criteria* (the note is a shared prompt prefix): would save one prefill per criterion, but changes the generation path relative to evaluation. Rejected for now.
+**Decision:**
+- Package `src/app/` with the UI (`ui.py`) separated from logic (`text`, `validate`, `aggregate`, `backend`, `pipeline`, `bench`, `render`, `report`). One command: `python -m src.app` → `http://localhost:7860`. `--prefetch` downloads every model beforehand (offline demo); `--smoke` runs the whole pipeline headless on tiny random Qwen2 models.
+- **Model from config:** `configs/app.yaml` names model, adapter, prompt version, draft, dtype and limits. With `use_final_selection: true`, once `results/final/selection.json` exists its adapter is used, with the prompt version looked up in `configs/final_eval.yaml`. Until then, run 1's adapter with prompt v1 is used. The source of the choice is shown in the UI and the report.
+- **Prompt parity:** prompts are built with `src.data.dataset.prompt_text`, the function used for training and evaluation.
+- **Malformed output:** option (c). A fallback label is shown but flagged 🔁 and counted as *unresolved* by the aggregation (D-029), so it can never by itself produce "eligible" or "not eligible". A model exception on one criterion is caught and recorded as an unresolved row; the other criteria still run.
+- **Sentence IDs:** a note already in the dataset's `<id>. sentence` format keeps its original IDs (rubric C3). Free text is split on sentence ends and line breaks (not on decimals, initials or abbreviations such as e.g./Dr./vs./y.o.) and numbered from 0, as the dataset is.
+- **Input limits** (`app.yaml`): note ≤ 6,000 characters and ≤ 60 sentences; ≤ 20 criteria (≈ 2 min at ≈ 6 s each); criterion ≤ 600 characters; every full prompt ≤ 1,024 tokens (the training `max_len`), with a warning above 640 tokens (the longest training prompt is 597, D-008). Blank criterion lines are dropped and duplicates removed, with a notice.
+- **Flags per criterion:** 🟠 missing information (label "not enough information"); ⚪ no supporting evidence cited (a definite label with no cited sentence: the D-016 tension); 🔴 hallucinated sentence IDs dropped; 🔁 retried / fallback.
+- **Benchmark tab:** four modes run live on the same prompt (a criterion from the Screen tab, or custom text): uncached reference (`greedy_no_cache`), HF `DynamicCache` loop (`greedy_hf_cache`), hand-written decoder with explicit KV cache (`greedy_manual`), and speculative decoding with the 0.5B draft (`speculative_greedy`, k selectable). It shows prefill/decode/total time, tok/s, speed-up, KV-cache size from `kv_bytes_per_token`, acceptance rate, forward-pass counts and token equality against the uncached reference, plus charts drawn from the measured numbers. The T4 numbers (runs.md attempt 9) are shown only as a labelled reference.
+- **Export:** Markdown and self-contained HTML (printable to PDF from the browser), with model, adapter and its source, prompt version, dtype/device, full decoding settings, fallback method, aggregation rule, git commit, library versions and UTC timestamp.
+- **Examples:** `data/app_examples.json`, exported from **val and train only** by `python -m src.app.examples`. Test patients are rejected at export time, at app start-up and in a unit test. Each example carries the expert labels, shown in an extra column only for criteria whose text is unchanged.
+**Why:** each rubric item maps to a visible feature, and every model-facing step reuses the evaluated code (prompt, parser, decoding config, explanation), so the app shows the system that was measured.
+**Consequences/risks:** CPU bf16 can differ from the GPU fp16 evaluation in rare near-tie tokens (D-019/D-023), so app outputs may occasionally differ from the logged val predictions. The uncached benchmark mode is slow on CPU (each step costs about one prefill), so its default output length is 16 tokens. The fallback's label is a likelihood ranking, not a generated answer, which is why it counts as unresolved.
+**Status:** accepted
+## D-029: Overall preliminary outcome: explicit aggregation rule (2026-11-10)
+**Context:** the dataset labels criteria, not patient–trial pairs. The assignment requires any overall verdict to be "an aggregation based on explicit rules, not presented as a separately ground-truth-labelled outcome".
+**Per-criterion status:**
+
+| Type | Blocking | Unresolved | Satisfied | Neutral |
+|---|---|---|---|---|
+| Inclusion | not included | not enough information; unparseable; fallback; model error | included | not applicable |
+| Exclusion | excluded | not enough information; unparseable; fallback; model error | not excluded | not applicable |
+
+**Rule (first match wins):**
+1. Any **blocking** criterion → **Not eligible (preliminary)**. Unresolved criteria are still listed.
+2. Otherwise, any **unresolved** criterion, *or* no inclusion criterion is satisfied → **Needs review**.
+3. Otherwise → **Likely eligible (preliminary)**.
+
+**Options considered:** (a) the initial sketch: "eligible only if every inclusion criterion is included and no exclusion criterion is excluded; needs review if any is NEI or unparseable; otherwise not eligible"; (b) the rule above.
+**Why (b):**
+- *Not applicable is neutral.* Under (a), one inclusion criterion that doesn't apply (e.g. a pregnancy test for a male patient) would fail every patient. Val has 12 "not applicable" labels.
+- *A definite failure takes precedence over unknowns.* An unknown answer cannot rescue a patient who clearly fails another criterion, so "needs review" would be misleading there. The unknowns are still listed for a reviewer.
+- *At least one inclusion criterion must be satisfied for "likely eligible",* so a list of only exclusion or not-applicable criteria cannot produce "eligible".
+- *"No evidence cited" does not change the outcome.* Experts label "not excluded" when nothing is reported (75% of train "not excluded" labels cite no evidence, D-016), so forcing review on it would make almost every case "needs review". The outcome card instead states how many decisions rest on absence of information.
+**Implementation:** `src/app/aggregate.py` (`criterion_status`, `aggregate`, `RULE_TEXT`), unit-tested case by case. The UI and every report print the rule and label the result "rule-based aggregation of model predictions, not ground truth and not a clinical decision".
+**Status:** accepted (approved by the user, 2026-11-10)
+## D-030: Final model = run 4; test results; test split locked (2026-11-10)
+**Context:** the final evaluation (D-024, runs.md attempt 12) re-scored all six models on val at pure greedy, selected by val macro-F1, and evaluated the selected model and its zero-shot counterpart on test exactly once.
+**Evidence:** val macro-F1 run4 0.604 > run1 0.432 > run3 0.379 > run2 0.335 → **run 4 selected** (`umairishuman/trialspec-qwen2.5-1.5b-lora-run4`, prompt v1). Test (n=206): accuracy **0.738**, macro-F1 **0.660** (7 classes; "excluded" has no test support), inclusion 0.664, exclusion 0.514, evidence micro-F1 0.544, 0 hallucinated IDs, 0 parse failures. Zero-shot v1 on the same examples and settings: 0.136 / 0.131 / evidence 0.000. Pure greedy vs Qwen's hidden repetition_penalty 1.1 changed 1 of 1,236 val outputs and no labels, so D-020 did not affect any earlier conclusion.
+**Decision:** run 4 is the final model for the report and the app. The app needs no change: `configs/app.yaml` has `use_final_selection: true`, so it now reads `results/final/selection.json` (D-028). `test_lock.json` is committed, so any further test run requires `--allow-test-rerun` and a new decision entry. No model, prompt or threshold changes are made after seeing test.
+**Caveats for the report:** (1) val macro-F1's lead over run 1 depends partly on 2 "excluded" examples (D-027); test has none, so the test macro-F1 is not affected by that. (2) The weakest class is exclusion "not enough information" (test F1 0.154, recall 0.107): when the note is silent the model mostly answers "not excluded", which follows the expert majority convention (D-016) but is exactly the case where absent evidence is not proof. The app flags such decisions as "no supporting evidence cited". (3) Val and test each have 8 patients, so per-class numbers with support ≤ 7 are noisy.
 **Status:** accepted
