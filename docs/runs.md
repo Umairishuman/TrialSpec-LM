@@ -17,7 +17,7 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 8 | 2026-11-06 | Laptop CPU | Task 5 speculative verification / 3a2e7a6 | **Success** (after 2 test-design fixes) | 1.5B/0.5B bf16: tokens identical to greedy, acceptance 50–58%, 0.7× speed on CPU |
 | 9 | 2026-11-06 | Kaggle T4 | benchmarks (Tasks 3–5) / 78cdfab | **Success** (2,983 s) | KV cache 9.3× decode speed-up; tiled attn correct but slow; speculative exact, 0.61–0.80× |
 | 10 | 2026-11-10 | Kaggle T4 | run4 / 14eb0b5 | Failed in 1 min | `kaggle_pipeline.sh: line 19: $2: unbound variable` |
-| 11 | 2026-11-10 | Kaggle T4 | run4 / (fix commit) | Planned (re-launch) | — |
+| 11 | 2026-11-10 | Kaggle T4 | run4 / b8a687a | Planned (re-launch) | — |
 | 12 | 2026-11-10 | Kaggle T4 | final_eval / (to be filled) | Planned (after run 4) | — |
 
 ---

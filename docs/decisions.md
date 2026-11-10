@@ -52,7 +52,7 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-10 | S6 | Error categorisation and case files (`src/eval/error_analysis.py`), confusion-matrix figures (`src/eval/plots.py`); `matplotlib` added to requirements | C4 (≥8 analysed errors), report figures | D-024 | dc1dfb5 |
 | 2026-11-10 | S6 | `compare.row` shows N/A for a missing inclusion/exclusion block | New orchestrator test found a crash: the 4-example smoke sample contains no exclusion criteria | D-024 | dc1dfb5 |
 | 2026-11-10 | S5/S11 | `src/train/export_wandb.py`: pulls every non-smoke W&B run's history to `results/training/wandb_export/*.csv` (+ `runs.json` with run URLs and configs) and draws `training_curves.png` (train/val loss, LR, grad norm). Runs 1–3 exported; run 4 to be added when it finishes | Report needs training curves (B3, H1); user provided W&B access | D-025 | 520691a |
-| 2026-11-10 | S5 | `kaggle_pipeline.sh`: `cfg` helper uses `${2:-}` instead of `$2` | Run 4 launch failed after ~1 min: `$2: unbound variable` under `set -u` (runs.md attempt 10) | D-022 | — |
+| 2026-11-10 | S5 | `kaggle_pipeline.sh`: `cfg` helper uses `${2:-}` instead of `$2` | Run 4 launch failed after ~1 min: `$2: unbound variable` under `set -u` (runs.md attempt 10) | D-022 | b8a687a |
 
 ---
 
