@@ -54,8 +54,8 @@ Stages follow `ASSIGNMENT_PLAN.md`: S1 Setup · S2 Dataset/split · S3 Research/
 | 2026-11-10 | S5/S11 | `src/train/export_wandb.py`: pulls every non-smoke W&B run's history to `results/training/wandb_export/*.csv` (+ `runs.json` with run URLs and configs) and draws `training_curves.png` (train/val loss, LR, grad norm). Runs 1–3 exported; run 4 to be added when it finishes | Report needs training curves (B3, H1); user provided W&B access | D-025 | 520691a |
 | 2026-11-10 | S5 | `kaggle_pipeline.sh`: `cfg` helper uses `${2:-}` instead of `$2` | Run 4 launch failed after ~1 min: `$2: unbound variable` under `set -u` (runs.md attempt 10) | D-022 | b8a687a |
 | 2026-11-10 | S10 | App hosting: run locally on the laptop (CPU, bf16, target 1.5B + draft 0.5B); optional HF Space only as a public backup. Reverses the 2026-11-05 "HF Space" plan | Measured: laptop ran both models in bf16 (runs.md attempt 8, 5.4 tok/s); free Space has 2 shared vCPUs | D-026 | e8197a1 |
-| 2026-11-10 | S5 | **Run 4 results recorded** (runs.md attempt 11): val macro-F1 0.604 vs run 1's 0.432 at rp 1.1; run 4 files copied from `results-v4.zip` into `results/` | Run 4 finished | D-027 | (to be filled) |
-| 2026-11-10 | S5/S11 | W&B export re-run: run 4 history added, `training_curves.png` redrawn with 4 runs | D-025 said to add run 4 when it finished | D-025, D-027 | (to be filled) |
+| 2026-11-10 | S5 | **Run 4 results recorded** (runs.md attempt 11): val macro-F1 0.604 vs run 1's 0.432 at rp 1.1; run 4 files copied from `results-v4.zip` into `results/` | Run 4 finished | D-027 | 1b45c79 |
+| 2026-11-10 | S5/S11 | W&B export re-run: run 4 history added, `training_curves.png` redrawn with 4 runs | D-025 said to add run 4 when it finished | D-025, D-027 | 1b45c79 |
 
 ---
 
