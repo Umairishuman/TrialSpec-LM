@@ -16,8 +16,9 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 | 7 | 2026-11-06 | Laptop CPU | Task 3 KV-cache verification / 0d8f427 | **Success** | Manual decoder = HF to 3e-5 (fp32); all 4 decoding paths token-identical |
 | 8 | 2026-11-06 | Laptop CPU | Task 5 speculative verification / 3a2e7a6 | **Success** (after 2 test-design fixes) | 1.5B/0.5B bf16: tokens identical to greedy, acceptance 50–58%, 0.7× speed on CPU |
 | 9 | 2026-11-06 | Kaggle T4 | benchmarks (Tasks 3–5) / 78cdfab | **Success** (2,983 s) | KV cache 9.3× decode speed-up; tiled attn correct but slow; speculative exact, 0.61–0.80× |
-| 10 | 2026-11-06 | Kaggle T4 | run4 / 1144c1c | Running (launched 2026-11-10) | — |
-| 11 | 2026-11-10 | Kaggle T4 | final_eval / (to be filled) | Planned (after run 4) | — |
+| 10 | 2026-11-10 | Kaggle T4 | run4 / 14eb0b5 | Failed in 1 min | `kaggle_pipeline.sh: line 19: $2: unbound variable` |
+| 11 | 2026-11-10 | Kaggle T4 | run4 / (fix commit) | Planned (re-launch) | — |
+| 12 | 2026-11-10 | Kaggle T4 | final_eval / (to be filled) | Planned (after run 4) | — |
 
 ---
 
@@ -212,14 +213,21 @@ Design reasoning lives in `docs/decisions.md` (D-XXX); this file is the chronolo
 - **What would make it faster** (not done; out of scope): a shallower draft (few layers), CUDA graphs / `torch.compile` to remove launch overhead (which would bring c toward the parameter ratio), or a larger batch.
 - **Memory:** extra peak 116–155 MiB (task) and 60–96 MiB (free) on top of both models' weights (2.9 GB + 0.9 GB), mostly the two KV caches plus the k+1-token verification activations.
 
-## Attempt 10 = Run 4: prompt v1 + oversampling + F1 selection (planned)
+## Attempt 10: Run 4, first launch (failed)
+- **Run:** Kaggle notebook, `CONFIG = 'configs/run4.yaml'`, cloned commit 14eb0b5. Setup and GPU check passed (Tesla T4, torch 2.11.0+cu130, transformers 5.22.1, peft 0.21.2).
+- **What happened:** the pipeline script stopped at once with `scripts/kaggle_pipeline.sh: line 19: $2: unbound variable` (exit 1, about 70 s into the notebook, before tests or any GPU work).
+- **Why:** commit 1144c1c gave the `cfg` helper a default-value argument (`'$2'`), but the script runs with `set -u`, and calls such as `cfg run_name` pass only one argument, so `$2` is unbound. Runs 1–3 used an older version of the script without that helper, and this shell code was never executed locally (only the Python modules are covered by pytest).
+- **Fix:** `${2:-}` in the helper (empty default when not given). Verified locally by running the config-parsing part of the script under `set -euo pipefail` for `run4.yaml` (prompt v1, rp 1.1, select_by val_macro_f1) and `run1.yaml`; `bash -n` syntax check on all four Kaggle scripts.
+- **Lesson:** shell glue is code too: after editing a Kaggle script, run its non-GPU part locally before launching.
+
+## Attempt 11 = Run 4: prompt v1 + oversampling + F1 selection (planned re-launch of attempt 10)
 - **Config:** `configs/run4.yaml`. Same as run 1 except: oversampling (target 60, max 4×, as in run 2); `select_by: val_macro_f1`; all checkpoints kept. `eval_repetition_penalty: 1.1`, so its val numbers are directly comparable with runs 1–3; zero-shot baseline skipped (it already exists for v1 at 1.1).
 - **Why:** completes a 2×2 ablation, with prompt {v1, v2} × oversampling {off, on} = run 1, run 4, run 3, run 2. Run 2 was the only oversampling run, and it was loss-selected with prompt v2, so oversampling has not been fairly tested yet.
 - **Hypothesis:** with the v1 prompt (which keeps the exclusion NEI boundary) and F1 selection, oversampling raises rare-class recall and macro-F1 above run 1's 0.432. If it doesn't, oversampling is rejected for this data.
 - **Caveat:** run 1 was selected by loss, runs 3–4 by F1. Run 1's checkpoints weren't kept, so this can't be equalised without retraining. It will be stated in the report.
 - **Results:** (to be filled in)
 
-## Attempt 11: final evaluation, val selection + test once (planned)
+## Attempt 12: final evaluation, val selection + test once (planned)
 - **Run:** Kaggle notebook with `CONFIG = 'final_eval'` → `scripts/kaggle_final_eval.sh`: tests → smoke (`final_eval --smoke`: 4 val examples per model, every adapter downloaded, no test access) → full final evaluation. Protocol: D-024.
 - **Precondition:** run 4 finished and its selected adapter is on `huggingface.co/umairishuman/trialspec-qwen2.5-1.5b-lora-run4`. If the push failed, the smoke stage stops within minutes.
 - **Config** (`configs/final_eval.yaml`): pure greedy (repetition_penalty 1.0), max 64 new tokens, batch 8, fp16. Stage A on val: zeroshot-v1, zeroshot-v2, run1–run4. Selection: max val macro-F1 → val accuracy → config order. Stage B on test: the selected run and the zero-shot baseline with its prompt version.

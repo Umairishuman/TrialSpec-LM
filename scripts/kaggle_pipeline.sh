@@ -16,7 +16,7 @@ for a in "$@"; do
   esac
 done
 
-cfg() { python -c "import yaml; v=yaml.safe_load(open('$CONFIG')).get('$1', '$2'); print('' if v is None else v)"; }
+cfg() { python -c "import yaml; v=yaml.safe_load(open('$CONFIG')).get('$1', '${2:-}'); print('' if v is None else v)"; }   # ${2:-}: set -u (run 4 attempt 1)
 RUN=$(cfg run_name)
 PV=$(cfg prompt_version)
 MODEL=$(cfg model_id)
